@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import pytest
 
+from app.limiter import reset_rate_limits
 from app.services.cache import clear_all_caches
 
 
@@ -12,3 +13,12 @@ def _isolated_caches():
     clear_all_caches()
     yield
     clear_all_caches()
+
+
+@pytest.fixture(autouse=True)
+def _reset_rate_limits():
+    """TestClient hits rate-limited endpoints from the same address across many tests in
+    one run; without this, later tests in a file start getting 429s instead of the status
+    codes they're actually asserting."""
+    reset_rate_limits()
+    yield

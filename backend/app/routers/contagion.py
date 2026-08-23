@@ -3,8 +3,9 @@ from __future__ import annotations
 
 import logging
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 
+from app.limiter import rate_limit
 from app.models import (
     ContagionSummary,
     GraphEdge,
@@ -21,7 +22,12 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/v1", tags=["contagion"])
 
 
-@router.post("/simulate-shock", response_model=ShockSimulationResponse)
+@router.post(
+    "/simulate-shock",
+    response_model=ShockSimulationResponse,
+    # fetches full price history + fundamentals for every holding
+    dependencies=[Depends(rate_limit("10/minute"))],
+)
 def simulate_shock_endpoint(request: ShockSimulationRequest) -> ShockSimulationResponse:
     tickers = [h.ticker for h in request.holdings]
     requested_weights = {h.ticker: h.weight for h in request.holdings}

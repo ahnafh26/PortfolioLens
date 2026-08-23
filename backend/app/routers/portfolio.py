@@ -4,8 +4,9 @@ from __future__ import annotations
 import logging
 
 import numpy as np
-from fastapi import APIRouter, HTTPException, Response
+from fastapi import APIRouter, Depends, HTTPException, Response
 
+from app.limiter import limit_concurrent_analysis, rate_limit
 from app.models import (
     AnalyzeRequest,
     AnalyzeResponse,
@@ -47,7 +48,12 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/portfolio", tags=["portfolio"])
 
 
-@router.post("/analyze", response_model=AnalyzeResponse)
+@router.post(
+    "/analyze",
+    response_model=AnalyzeResponse,
+    # runs a full optimization sweep + 10k-path Monte Carlo per call
+    dependencies=[Depends(rate_limit("10/minute")), Depends(limit_concurrent_analysis)],
+)
 def analyze_portfolio(request: AnalyzeRequest) -> AnalyzeResponse:
     tickers = [h.ticker for h in request.holdings]
     requested_weights = {h.ticker: h.weight for h in request.holdings}
@@ -148,7 +154,12 @@ def analyze_portfolio(request: AnalyzeRequest) -> AnalyzeResponse:
     )
 
 
-@router.post("/backtest", response_model=BacktestResponse)
+@router.post(
+    "/backtest",
+    response_model=BacktestResponse,
+    # fetches full price history for every holding + the benchmark
+    dependencies=[Depends(rate_limit("10/minute"))],
+)
 def backtest_portfolio(request: BacktestRequest) -> BacktestResponse:
     if request.period == "custom":
         label, start, end = "Custom period", request.start_date, request.end_date
@@ -180,7 +191,7 @@ def backtest_portfolio(request: BacktestRequest) -> BacktestResponse:
     )
 
 
-@router.post("/rebalance", response_model=RebalanceResponse)
+@router.post("/rebalance", response_model=RebalanceResponse, dependencies=[Depends(rate_limit("20/minute"))])
 def rebalance(request: RebalanceRequest) -> RebalanceResponse:
     holdings = [(h.ticker, h.weight, h.current_value) for h in request.holdings]
     result = rebalance_portfolio(holdings, request.total_value)
@@ -207,7 +218,7 @@ def rebalance(request: RebalanceRequest) -> RebalanceResponse:
     )
 
 
-@router.post("/export/csv")
+@router.post("/export/csv", dependencies=[Depends(rate_limit("20/minute"))])
 def export_csv(request: ExportRequest) -> Response:
     csv_bytes = generate_csv(request.analysis, request.ai_insights)
     return Response(
@@ -217,7 +228,7 @@ def export_csv(request: ExportRequest) -> Response:
     )
 
 
-@router.post("/export/pdf")
+@router.post("/export/pdf", dependencies=[Depends(rate_limit("20/minute"))])
 def export_pdf(request: ExportRequest) -> Response:
     pdf_bytes = generate_pdf(request.analysis, request.ai_insights)
     return Response(

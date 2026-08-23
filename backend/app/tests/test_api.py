@@ -77,3 +77,24 @@ def test_ticker_search_returns_empty_list_for_nonsense_query():
     assert response.status_code == 200
     # fuzzy search may still return junk matches, just check it doesn't error and respects the cap
     assert len(response.json()["results"]) <= 50
+
+
+def test_ticker_search_is_rate_limited_per_ip():
+    """/api/tickers/search is capped at 30/minute; the request past that cap should be
+    rejected rather than silently letting a single client hammer the endpoint forever."""
+    for _ in range(30):
+        response = client.get("/api/tickers/search", params={"q": "AAPL"})
+        assert response.status_code == 200
+
+    response = client.get("/api/tickers/search", params={"q": "AAPL"})
+    assert response.status_code == 429
+
+
+def test_oversized_request_body_is_rejected_with_413():
+    payload = b'{"holdings": [{"ticker": "AAPL", "weight": 1.0}], "lookback_years": 5, "padding": "' + b"a" * (2 * 1024 * 1024) + b'"}'
+    response = client.post(
+        "/api/portfolio/analyze",
+        content=payload,
+        headers={"Content-Type": "application/json"},
+    )
+    assert response.status_code == 413

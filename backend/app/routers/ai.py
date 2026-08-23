@@ -1,8 +1,9 @@
 """AI Assistant endpoints."""
 from __future__ import annotations
 
-from fastapi import APIRouter, Query
+from fastapi import APIRouter, Depends, Query
 
+from app.limiter import rate_limit
 from app.models import (
     AIInsightsRequest,
     AIInsightsResponse,
@@ -15,7 +16,12 @@ from app.services.ai_assistant import generate_insights, generate_ticker_researc
 router = APIRouter(prefix="/api/ai", tags=["ai"])
 
 
-@router.post("/insights", response_model=AIInsightsResponse)
+@router.post(
+    "/insights",
+    response_model=AIInsightsResponse,
+    # LLM call when OPENROUTER_API_KEY is set -- real cost per request
+    dependencies=[Depends(rate_limit("5/minute"))],
+)
 def insights(request: AIInsightsRequest) -> AIInsightsResponse:
     weights = {h.ticker: h.weight for h in request.holdings}
     sector_breakdown = {s.label: s.weight for s in request.sector_breakdown}
@@ -32,7 +38,11 @@ def insights(request: AIInsightsRequest) -> AIInsightsResponse:
     return AIInsightsResponse(insights=result.insights, source=result.source)
 
 
-@router.get("/research", response_model=TickerResearchResponse)
+@router.get(
+    "/research",
+    response_model=TickerResearchResponse,
+    dependencies=[Depends(rate_limit("5/minute"))],
+)
 def research(ticker: str = Query(..., min_length=1, max_length=10)) -> TickerResearchResponse:
     ticker = ticker.strip().upper()
     result = generate_ticker_research(ticker)
@@ -47,7 +57,11 @@ def research(ticker: str = Query(..., min_length=1, max_length=10)) -> TickerRes
     )
 
 
-@router.post("/suggested-allocation", response_model=SuggestedAllocationResponse)
+@router.post(
+    "/suggested-allocation",
+    response_model=SuggestedAllocationResponse,
+    dependencies=[Depends(rate_limit("20/minute"))],
+)
 def get_suggested_allocation(request: SuggestedAllocationRequest) -> SuggestedAllocationResponse:
     holdings = [(h.ticker, h.annual_return, h.annual_volatility) for h in request.holdings]
     weights, rationale = suggested_allocation(holdings, request.risk_profile)
