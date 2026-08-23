@@ -240,6 +240,53 @@ def test_monte_carlo_is_deterministic_given_a_seed(mc_returns):
     assert result_1.value_at_risk_95 == pytest.approx(result_2.value_at_risk_95)
 
 
+def _reference_monte_carlo_bands(returns, weights, years, n_simulations, seed):
+    """Un-optimized reference implementation (allocates a fresh array at every step,
+    instead of reusing one buffer in place) -- pins down that the in-place version in
+    monte_carlo_simulation produces identical numbers, not just a plausible-looking result."""
+    rng = np.random.default_rng(seed)
+    tickers = list(returns.columns)
+    n_assets = len(tickers)
+    weight_vector = np.array([weights[t] for t in tickers])
+
+    mean_daily = returns.mean().to_numpy()
+    cov_daily = returns.cov().to_numpy()
+    drift_daily = mean_daily - 0.5 * np.diag(cov_daily)
+    chol = np.linalg.cholesky(cov_daily + analysis.COVARIANCE_JITTER * np.eye(n_assets))
+
+    total_days = years * analysis.TRADING_DAYS_PER_YEAR
+    n_checkpoints = 50
+    checkpoint_days = np.linspace(0, total_days, n_checkpoints, dtype=int)
+    if analysis.TRADING_DAYS_PER_YEAR not in checkpoint_days and analysis.TRADING_DAYS_PER_YEAR <= total_days:
+        checkpoint_days = np.sort(np.unique(np.append(checkpoint_days, analysis.TRADING_DAYS_PER_YEAR)))
+    else:
+        checkpoint_days = np.unique(checkpoint_days)
+    step_lengths = np.diff(checkpoint_days)
+    n_steps = len(step_lengths)
+
+    z = rng.standard_normal((n_simulations, n_steps, n_assets))
+    correlated_noise = z @ chol.T
+    sqrt_dt = np.sqrt(step_lengths)[None, :, None]
+    dt = step_lengths[None, :, None]
+    log_returns = drift_daily[None, None, :] * dt + correlated_noise * sqrt_dt
+    cumulative_log_returns = np.cumsum(log_returns, axis=1)
+    asset_growth = np.exp(cumulative_log_returns)
+    ones = np.ones((n_simulations, 1, n_assets))
+    asset_growth = np.concatenate([ones, asset_growth], axis=1)
+    portfolio_value = asset_growth @ weight_vector
+
+    return np.percentile(portfolio_value, [5, 25, 50, 75, 95], axis=0)
+
+
+def test_monte_carlo_in_place_arrays_match_the_unoptimized_reference(mc_returns):
+    weights = {"A": 0.6, "B": 0.4}
+    result = analysis.monte_carlo_simulation(mc_returns, weights, years=2, n_simulations=1_000, seed=7)
+    reference_percentiles = _reference_monte_carlo_bands(mc_returns, weights, years=2, n_simulations=1_000, seed=7)
+
+    actual = np.array([[b.p5, b.p25, b.p50, b.p75, b.p95] for b in result.bands]).T
+    assert np.array_equal(actual, reference_percentiles)
+
+
 # fetch_price_history (yfinance mocked, no network)
 
 class _FakeYfTicker:

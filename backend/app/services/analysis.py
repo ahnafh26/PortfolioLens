@@ -289,13 +289,18 @@ def monte_carlo_simulation(
 
     z = rng.standard_normal((n_simulations, n_steps, n_assets))
     correlated_noise = z @ chol.T
+    del z  # (n_simulations, n_steps, n_assets) can be sizeable; drop it once its one use is done
 
     sqrt_dt = np.sqrt(step_lengths)[None, :, None]
     dt = step_lengths[None, :, None]
 
-    log_returns = drift_daily[None, None, :] * dt + correlated_noise * sqrt_dt
-    cumulative_log_returns = np.cumsum(log_returns, axis=1)
-    asset_growth = np.exp(cumulative_log_returns)
+    # build log-returns, then cumsum, then exp in place on the same buffer -- one big
+    # (sim x checkpoint x asset) array alive at a time instead of four
+    correlated_noise *= sqrt_dt
+    correlated_noise += drift_daily[None, None, :] * dt
+    asset_growth = correlated_noise
+    np.cumsum(asset_growth, axis=1, out=asset_growth)
+    np.exp(asset_growth, out=asset_growth)
 
     # prepend day 0 = growth multiple of 1.0
     ones = np.ones((n_simulations, 1, n_assets))
