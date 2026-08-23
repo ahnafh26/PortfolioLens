@@ -38,7 +38,7 @@ export const chartInk = {
 // canvas needs a literal color, not a CSS var - matches the --card token
 export const chartSurface = { light: "#ffffff", dark: "#232329" };
 
-export const chartFontFamily = "var(--font-inter), system-ui, sans-serif";
+export const chartFontFamily = "var(--font-sans), system-ui, sans-serif";
 
 function hexToRgb(hex: string): [number, number, number] {
   const n = parseInt(hex.slice(1), 16);
