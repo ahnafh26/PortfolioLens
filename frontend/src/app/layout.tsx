@@ -31,7 +31,7 @@ export const metadata: Metadata = {
     "Build a portfolio, then see its risk, return, correlation, and efficient frontier at a glance.",
 };
 
-export default function RootLayout({ children }: LayoutProps<"/">) {
+export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html
       lang="en"

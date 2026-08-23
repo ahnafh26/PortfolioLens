@@ -5,10 +5,13 @@ import type { NextConfig } from "next";
 // wherever NEXT_PUBLIC_API_BASE_URL points, not just this frontend's own origin.
 const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000";
 
+// 'unsafe-inline' on script-src (not just style-src): these routes are static-prerendered,
+// and Next ships its hydration payload and theme-detection script as inline <script> tags
+// with no per-request nonce support for static pages. No dangerouslySetInnerHTML anywhere
+// in this codebase, so the added risk is low.
 const contentSecurityPolicy = [
   "default-src 'self'",
-  "script-src 'self'",
-  // framer-motion animates via inline style="" attributes; CSP's style-src covers those too
+  "script-src 'self' 'unsafe-inline'",
   "style-src 'self' 'unsafe-inline'",
   "img-src 'self' data:",
   "font-src 'self' data:",
