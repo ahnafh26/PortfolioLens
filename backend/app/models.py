@@ -2,9 +2,11 @@
 from __future__ import annotations
 
 import re
+from collections.abc import Sequence
 from datetime import date, datetime, timedelta
+from typing import Annotated, Protocol
 
-from pydantic import BaseModel, Field, field_validator, model_validator
+from pydantic import AfterValidator, BaseModel, Field, field_validator, model_validator
 
 # real-world symbols look like AAPL, BRK.B, BF-B -- this also keeps ticker strings out of
 # reach of CSV-formula-injection payloads (=, @, ...) and yfinance requests built from junk input
@@ -21,14 +23,28 @@ def _validate_ticker(v: str) -> str:
     return upper
 
 
-class HoldingInput(BaseModel):
-    ticker: str = Field(..., min_length=1, max_length=10, description="Exchange ticker symbol, e.g. AAPL")
-    weight: float = Field(..., gt=0, le=1, description="Fraction of the portfolio allocated to this holding, e.g. 0.25 for 25%")
+# uppercases + validates on assignment, reused by every model with a ticker field
+Ticker = Annotated[str, AfterValidator(_validate_ticker)]
 
-    @field_validator("ticker")
-    @classmethod
-    def _uppercase_ticker(cls, v: str) -> str:
-        return _validate_ticker(v)
+
+class _WeightedHolding(Protocol):
+    ticker: str
+    weight: float
+
+
+def _check_weights_sum_to_one_and_unique(holdings: Sequence[_WeightedHolding]) -> None:
+    total = sum(h.weight for h in holdings)
+    # small epsilon, frontend sends stuff like 0.3333 repeating
+    if abs(total - 1.0) > 0.01:
+        raise ValueError(f"Holding weights must sum to 1.0 (100%); received {total:.4f}")
+    tickers = [h.ticker for h in holdings]
+    if len(tickers) != len(set(tickers)):
+        raise ValueError("Duplicate tickers are not allowed in a single portfolio")
+
+
+class HoldingInput(BaseModel):
+    ticker: Ticker = Field(..., min_length=1, max_length=10, description="Exchange ticker symbol, e.g. AAPL")
+    weight: float = Field(..., gt=0, le=1, description="Fraction of the portfolio allocated to this holding, e.g. 0.25 for 25%")
 
 
 class HoldingsRequestBase(BaseModel):
@@ -39,13 +55,7 @@ class HoldingsRequestBase(BaseModel):
     @field_validator("holdings")
     @classmethod
     def _weights_sum_to_one(cls, holdings: list[HoldingInput]) -> list[HoldingInput]:
-        total = sum(h.weight for h in holdings)
-        # small epsilon, frontend sends stuff like 0.3333 repeating
-        if abs(total - 1.0) > 0.01:
-            raise ValueError(f"Holding weights must sum to 1.0 (100%); received {total:.4f}")
-        tickers = [h.ticker for h in holdings]
-        if len(tickers) != len(set(tickers)):
-            raise ValueError("Duplicate tickers are not allowed in a single portfolio")
+        _check_weights_sum_to_one_and_unique(holdings)
         return holdings
 
 
@@ -218,14 +228,9 @@ class BacktestResponse(BaseModel):
 
 
 class CurrentHolding(BaseModel):
-    ticker: str = Field(..., min_length=1, max_length=10)
+    ticker: Ticker = Field(..., min_length=1, max_length=10)
     weight: float = Field(..., gt=0, le=1, description="Target weight, e.g. 0.25 for 25%")
     current_value: float = Field(default=0.0, ge=0, description="Current dollar value already held in this ticker (0 if starting fresh)")
-
-    @field_validator("ticker")
-    @classmethod
-    def _uppercase_ticker(cls, v: str) -> str:
-        return _validate_ticker(v)
 
 
 class RebalanceRequest(BaseModel):
@@ -235,12 +240,7 @@ class RebalanceRequest(BaseModel):
     @field_validator("holdings")
     @classmethod
     def _weights_sum_to_one(cls, holdings: list[CurrentHolding]) -> list[CurrentHolding]:
-        total = sum(h.weight for h in holdings)
-        if abs(total - 1.0) > 0.01:
-            raise ValueError(f"Target weights must sum to 1.0 (100%); received {total:.4f}")
-        tickers = [h.ticker for h in holdings]
-        if len(tickers) != len(set(tickers)):
-            raise ValueError("Duplicate tickers are not allowed in a single portfolio")
+        _check_weights_sum_to_one_and_unique(holdings)
         return holdings
 
 
@@ -291,14 +291,9 @@ class TickerResearchResponse(BaseModel):
 
 
 class HoldingPerformance(BaseModel):
-    ticker: str = Field(..., min_length=1, max_length=10)
+    ticker: Ticker = Field(..., min_length=1, max_length=10)
     annual_return: float
     annual_volatility: float
-
-    @field_validator("ticker")
-    @classmethod
-    def _uppercase_ticker(cls, v: str) -> str:
-        return _validate_ticker(v)
 
 
 class SuggestedAllocationRequest(BaseModel):
@@ -334,7 +329,7 @@ class ExportRequest(BaseModel):
 
 
 class ShockSimulationRequest(HoldingsRequestBase):
-    origin_ticker: str = Field(..., min_length=1, max_length=10, description="Ticker where the price shock originates, e.g. AAPL")
+    origin_ticker: Ticker = Field(..., min_length=1, max_length=10, description="Ticker where the price shock originates, e.g. AAPL")
     shock_magnitude: float = Field(
         ..., lt=0, ge=-1, description="Percentage price drop at the origin, expressed as a negative fraction, e.g. -0.15 for -15%"
     )
@@ -342,11 +337,6 @@ class ShockSimulationRequest(HoldingsRequestBase):
         default=0.65, gt=0, le=1, description="How much the shock's impact shrinks per graph hop away from the origin"
     )
     lookback_years: int = Field(default=3, ge=1, le=20, description="How many years of daily price history to use for the correlation graph")
-
-    @field_validator("origin_ticker")
-    @classmethod
-    def _uppercase_origin(cls, v: str) -> str:
-        return _validate_ticker(v)
 
     @model_validator(mode="after")
     def _origin_is_a_holding(self) -> "ShockSimulationRequest":
