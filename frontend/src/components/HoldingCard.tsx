@@ -1,9 +1,10 @@
 "use client";
 
+import { X } from "lucide-react";
+
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { IconClose } from "@/components/icons";
 import type { BuilderHolding } from "@/lib/store";
 import { usePortfolioBuilder } from "@/lib/store";
 
@@ -47,7 +48,7 @@ export function HoldingCard({ holding }: { holding: BuilderHolding }) {
         onClick={() => removeHolding(holding.ticker)}
         aria-label={`Remove ${holding.ticker}`}
       >
-        <IconClose className="size-4" />
+        <X className="size-4" />
       </Button>
     </div>
   );
