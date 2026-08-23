@@ -26,7 +26,6 @@ import {
   type NodeProps,
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
-import { motion } from "framer-motion";
 
 import { Badge } from "@/components/ui/badge";
 import { IconBroadcast, IconInfo, IconShock, IconSpinner, IconTrendDown, IconWarning } from "@/components/icons";
@@ -197,12 +196,10 @@ function ContagionNode({ data }: NodeProps<ContagionRFNode>) {
     <>
       <Handle type="target" id="target" position={Position.Top} style={HANDLE_STYLE} isConnectable={false} />
       <Handle type="source" id="source" position={Position.Top} style={HANDLE_STYLE} isConnectable={false} />
-      <motion.div
-        initial={false}
-        animate={{ opacity: revealed ? 1 : 0.2, scale: revealed ? 1 : 0.6 }}
-        transition={{ duration: 0.35, ease: "easeOut" }}
+      <div
         className={cn(
-          "flex cursor-pointer flex-col items-center justify-center rounded-full border-2 text-center",
+          "flex cursor-pointer flex-col items-center justify-center rounded-full border-2 text-center transition-[opacity,transform] duration-[350ms] ease-out",
+          revealed ? "scale-100 opacity-100" : "scale-[0.6] opacity-20",
           statusClassName(graphNode.status),
           isOrigin && "ring-[3px] ring-accent ring-offset-2 ring-offset-background",
         )}
@@ -216,7 +213,7 @@ function ContagionNode({ data }: NodeProps<ContagionRFNode>) {
             {formatSignedPercent(graphNode.price_drawdown)}
           </span>
         )}
-      </motion.div>
+      </div>
     </>
   );
 }

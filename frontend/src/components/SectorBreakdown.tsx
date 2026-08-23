@@ -1,6 +1,6 @@
 "use client";
 
-import { motion } from "framer-motion";
+import { useEffect, useState } from "react";
 import { AlertTriangle } from "lucide-react";
 
 import { categorical, status as statusColors } from "@/lib/chart-colors";
@@ -13,6 +13,14 @@ function BreakdownBars({ items }: { items: BreakdownSlice[] }) {
   const palette = categorical[mode];
   const sorted = [...items].sort((a, b) => b.weight - a.weight);
 
+  // grows bars from 0 on mount -- a plain CSS transition can't animate a width
+  // change that happens on the very first render, so it needs one extra tick
+  const [grown, setGrown] = useState(false);
+  useEffect(() => {
+    const frame = requestAnimationFrame(() => setGrown(true));
+    return () => cancelAnimationFrame(frame);
+  }, []);
+
   return (
     <ul className="space-y-2.5">
       {sorted.map((s, i) => (
@@ -22,12 +30,13 @@ function BreakdownBars({ items }: { items: BreakdownSlice[] }) {
             <span className="tabular-nums text-muted-foreground">{formatPercent(s.weight, 0)}</span>
           </div>
           <div className="h-1.5 overflow-hidden rounded-full bg-muted">
-            <motion.div
-              className="h-full rounded-full"
-              style={{ backgroundColor: palette[i % palette.length] }}
-              initial={{ width: 0 }}
-              animate={{ width: `${s.weight * 100}%` }}
-              transition={{ duration: 0.4, ease: "easeOut", delay: i * 0.05 }}
+            <div
+              className="h-full rounded-full transition-[width] duration-[400ms] ease-out"
+              style={{
+                backgroundColor: palette[i % palette.length],
+                width: grown ? `${s.weight * 100}%` : 0,
+                transitionDelay: `${i * 50}ms`,
+              }}
             />
           </div>
         </li>

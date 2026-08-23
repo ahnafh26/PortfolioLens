@@ -1,9 +1,9 @@
 import { useEffect, useRef, useState } from "react";
-import { useReducedMotion } from "framer-motion";
+import { usePrefersReducedMotion } from "@/hooks/use-prefers-reduced-motion";
 
 export function useCountUp(target: number, durationMs = 900): number {
   const [value, setValue] = useState(target);
-  const prefersReducedMotion = useReducedMotion();
+  const prefersReducedMotion = usePrefersReducedMotion();
   const fromRef = useRef(0);
 
   useEffect(() => {

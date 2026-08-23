@@ -2,7 +2,6 @@
 
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
-import { motion } from "framer-motion";
 import {
   ArrowLeft,
   Download,
@@ -31,6 +30,7 @@ import { AllocationDonut } from "@/components/AllocationDonut";
 import { HoldingsTable } from "@/components/HoldingsTable";
 import { EmptyState } from "@/components/EmptyState";
 import { ErrorState } from "@/components/ErrorState";
+import { Reveal } from "@/components/Reveal";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
@@ -49,12 +49,6 @@ function ChartCardSkeleton({ title }: { title: string }) {
     </Card>
   );
 }
-
-const sectionMotion = {
-  initial: { opacity: 0, y: 12 },
-  animate: { opacity: 1, y: 0 },
-  transition: { duration: 0.3, ease: "easeOut" as const },
-};
 
 export default function AnalyzePage() {
   const holdings = usePortfolioBuilder((s) => s.holdings);
@@ -256,7 +250,7 @@ export default function AnalyzePage() {
               {loading || !data ? (
                 <ChartCardSkeleton title="Efficient frontier" />
               ) : (
-                <motion.div {...sectionMotion} className="min-w-0">
+                <Reveal className="min-w-0">
                   <Card>
                     <CardHeader>
                       <CardTitle className="flex items-center gap-1">
@@ -275,17 +269,13 @@ export default function AnalyzePage() {
                       />
                     </CardContent>
                   </Card>
-                </motion.div>
+                </Reveal>
               )}
 
               {loading || !data ? (
                 <ChartCardSkeleton title="10-year simulation" />
               ) : (
-                <motion.div
-                  {...sectionMotion}
-                  transition={{ ...sectionMotion.transition, delay: 0.05 }}
-                  className="min-w-0"
-                >
+                <Reveal delayMs={50} className="min-w-0">
                   <Card>
                     <CardHeader>
                       <CardTitle>10-year Monte Carlo simulation</CardTitle>
@@ -294,7 +284,7 @@ export default function AnalyzePage() {
                       <MonteCarloChart result={data.monte_carlo} />
                     </CardContent>
                   </Card>
-                </motion.div>
+                </Reveal>
               )}
             </div>
 
@@ -302,11 +292,7 @@ export default function AnalyzePage() {
               {loading || !data ? (
                 <ChartCardSkeleton title="Correlation" />
               ) : (
-                <motion.div
-                  {...sectionMotion}
-                  transition={{ ...sectionMotion.transition, delay: 0.1 }}
-                  className="min-w-0"
-                >
+                <Reveal delayMs={100} className="min-w-0">
                   <Card>
                     <CardHeader>
                       <CardTitle className="flex items-center gap-1">
@@ -323,17 +309,13 @@ export default function AnalyzePage() {
                       />
                     </CardContent>
                   </Card>
-                </motion.div>
+                </Reveal>
               )}
 
               {loading || !data ? (
                 <ChartCardSkeleton title="Holdings" />
               ) : (
-                <motion.div
-                  {...sectionMotion}
-                  transition={{ ...sectionMotion.transition, delay: 0.15 }}
-                  className="min-w-0"
-                >
+                <Reveal delayMs={150} className="min-w-0">
                   <Card>
                     <CardHeader>
                       <CardTitle>Holdings breakdown</CardTitle>
@@ -345,7 +327,7 @@ export default function AnalyzePage() {
                       <HoldingsTable holdings={data.holdings} />
                     </CardContent>
                   </Card>
-                </motion.div>
+                </Reveal>
               )}
             </div>
 
@@ -353,11 +335,7 @@ export default function AnalyzePage() {
               {loading || !data ? (
                 <ChartCardSkeleton title="Factor breakdown" />
               ) : (
-                <motion.div
-                  {...sectionMotion}
-                  transition={{ ...sectionMotion.transition, delay: 0.2 }}
-                  className="min-w-0"
-                >
+                <Reveal delayMs={200} className="min-w-0">
                   <Card>
                     <CardHeader>
                       <CardTitle>Sector &amp; market cap exposure</CardTitle>
@@ -366,17 +344,13 @@ export default function AnalyzePage() {
                       <SectorBreakdown breakdown={data.factor_breakdown} />
                     </CardContent>
                   </Card>
-                </motion.div>
+                </Reveal>
               )}
 
               {loading || !data ? (
                 <ChartCardSkeleton title="Rebalance calculator" />
               ) : (
-                <motion.div
-                  {...sectionMotion}
-                  transition={{ ...sectionMotion.transition, delay: 0.25 }}
-                  className="min-w-0"
-                >
+                <Reveal delayMs={250} className="min-w-0">
                   <Card>
                     <CardHeader>
                       <CardTitle>Rebalance calculator</CardTitle>
@@ -387,12 +361,12 @@ export default function AnalyzePage() {
                       />
                     </CardContent>
                   </Card>
-                </motion.div>
+                </Reveal>
               )}
             </div>
 
             {!loading && data && (
-              <motion.div {...sectionMotion} transition={{ ...sectionMotion.transition, delay: 0.3 }}>
+              <Reveal delayMs={300}>
                 <Card>
                   <CardHeader>
                     <CardTitle>Historical stress test</CardTitle>
@@ -403,16 +377,16 @@ export default function AnalyzePage() {
                     />
                   </CardContent>
                 </Card>
-              </motion.div>
+              </Reveal>
             )}
 
             {!loading && data && (
-              <motion.div {...sectionMotion} transition={{ ...sectionMotion.transition, delay: 0.35 }}>
+              <Reveal delayMs={350}>
                 <ContagionGraph
                   holdings={data.holdings.map((h) => ({ ticker: h.ticker, weight: h.weight }))}
                   lookbackYears={Math.min(lookbackYears, 5)}
                 />
-              </motion.div>
+              </Reveal>
             )}
           </>
         )}

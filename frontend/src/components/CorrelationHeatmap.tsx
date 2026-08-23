@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import { motion } from "framer-motion";
 
 import { correlationColor } from "@/lib/chart-colors";
 import { useChartTheme } from "@/hooks/use-chart-theme";
@@ -55,7 +54,7 @@ export function CorrelationHeatmap({ tickers, matrix }: CorrelationMatrixData) {
                 const isHovered = hovered?.row === i && hovered?.col === j;
                 return (
                   <td key={colTicker} className="p-0">
-                    <motion.div
+                    <div
                       role="gridcell"
                       tabIndex={0}
                       aria-label={`${rowTicker} vs ${colTicker}: correlation ${value.toFixed(2)}`}
@@ -63,11 +62,8 @@ export function CorrelationHeatmap({ tickers, matrix }: CorrelationMatrixData) {
                       onMouseLeave={() => setHovered(null)}
                       onFocus={() => setHovered({ row: i, col: j })}
                       onBlur={() => setHovered(null)}
-                      initial={{ opacity: 0, scale: 0.8 }}
-                      animate={{ opacity: 1, scale: 1 }}
-                      transition={{ duration: 0.2, delay: (i + j) * 0.008, ease: "easeOut" }}
                       className={cn(
-                        "relative flex items-center justify-center rounded-md text-[11px] font-medium tabular-nums outline-none transition-transform",
+                        "relative flex animate-in items-center justify-center rounded-md text-[11px] font-medium tabular-nums outline-none fade-in-0 zoom-in-75 duration-200 ease-out transition-transform",
                         isHovered && "z-10 scale-110 ring-2 ring-ring",
                       )}
                       style={{
@@ -75,10 +71,11 @@ export function CorrelationHeatmap({ tickers, matrix }: CorrelationMatrixData) {
                         height: cellSize,
                         backgroundColor: correlationColor(value, mode),
                         color: textColorFor(value),
+                        animationDelay: `${(i + j) * 8}ms`,
                       }}
                     >
                       {showInlineValues && value.toFixed(2)}
-                    </motion.div>
+                    </div>
                   </td>
                 );
               })}

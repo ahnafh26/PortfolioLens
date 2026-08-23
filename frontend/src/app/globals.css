@@ -1,11 +1,6 @@
 @import "tailwindcss";
 @plugin "tailwindcss-animate";
 
-/* Popover uses Framer Motion directly (see components/ui/popover.tsx).
- * Select/Dialog use tailwindcss-animate's data-state-driven keyframes
- * instead, since Radix's Select Portal/Viewport does its own internal
- * position measurement that fights being wrapped in a motion.div. */
-
 /* ---------------------------------------------------------------------------
  * Design tokens
  *

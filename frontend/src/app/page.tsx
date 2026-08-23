@@ -1,7 +1,6 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { AnimatePresence, motion } from "framer-motion";
 import { ArrowRight, Wallet } from "lucide-react";
 
 import { SiteHeader } from "@/components/SiteHeader";
@@ -9,6 +8,7 @@ import { TickerSearch } from "@/components/TickerSearch";
 import { HoldingCard } from "@/components/HoldingCard";
 import { AllocationProgress } from "@/components/AllocationProgress";
 import { EmptyState } from "@/components/EmptyState";
+import { Reveal } from "@/components/Reveal";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import {
@@ -36,12 +36,7 @@ export default function BuilderPage() {
       <SiteHeader />
 
       <main className="mx-auto flex w-full max-w-3xl flex-1 flex-col gap-8 px-4 py-12 sm:px-6 sm:py-20">
-        <motion.div
-          initial={{ opacity: 0, y: 8 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.3, ease: "easeOut" }}
-          className="space-y-3 text-center"
-        >
+        <Reveal className="space-y-3 text-center">
           <h1 className="text-3xl font-semibold tracking-tight sm:text-4xl">
             Build a portfolio. See its risk.
           </h1>
@@ -50,13 +45,9 @@ export default function BuilderPage() {
             use: volatility, Sharpe ratio, correlation, the efficient frontier, and
             a Monte Carlo simulation of where it could go.
           </p>
-        </motion.div>
+        </Reveal>
 
-        <motion.div
-          initial={{ opacity: 0, y: 12 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.35, ease: "easeOut", delay: 0.08 }}
-        >
+        <Reveal delayMs={80}>
           <Card>
             <CardHeader className="flex-row items-center justify-between gap-4 space-y-0 pb-4">
               <div className="flex items-center gap-2">
@@ -96,20 +87,15 @@ export default function BuilderPage() {
               ) : (
                 <>
                   <ul className="flex flex-col gap-2">
-                    <AnimatePresence initial={false}>
-                      {holdings.map((holding, i) => (
-                        <motion.li
-                          key={holding.ticker}
-                          layout
-                          initial={{ opacity: 0, y: -8, scale: 0.98 }}
-                          animate={{ opacity: 1, y: 0, scale: 1 }}
-                          exit={{ opacity: 0, scale: 0.96 }}
-                          transition={{ duration: 0.2, ease: "easeOut", delay: i * 0.03 }}
-                        >
-                          <HoldingCard holding={holding} />
-                        </motion.li>
-                      ))}
-                    </AnimatePresence>
+                    {holdings.map((holding, i) => (
+                      <li
+                        key={holding.ticker}
+                        className="animate-in fade-in-0 slide-in-from-top-2 duration-200 ease-out"
+                        style={{ animationDelay: `${i * 30}ms` }}
+                      >
+                        <HoldingCard holding={holding} />
+                      </li>
+                    ))}
                   </ul>
 
                   <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
@@ -122,7 +108,7 @@ export default function BuilderPage() {
               )}
             </CardContent>
           </Card>
-        </motion.div>
+        </Reveal>
 
         <div className="flex justify-center">
           <Button

@@ -2,7 +2,6 @@
 
 import * as React from "react";
 import * as PopoverPrimitive from "@radix-ui/react-popover";
-import { motion } from "framer-motion";
 
 import { cn } from "@/lib/utils";
 
@@ -10,7 +9,8 @@ const Popover = PopoverPrimitive.Root;
 const PopoverTrigger = PopoverPrimitive.Trigger;
 const PopoverAnchor = PopoverPrimitive.Anchor;
 
-// Radix handles mount/unmount, so we only need an entrance animation here
+// Radix handles mount/unmount and exposes it via data-state, so the entrance
+// animation is driven off that (same pattern as ui/select.tsx)
 function PopoverContent({
   className,
   align = "start",
@@ -20,18 +20,16 @@ function PopoverContent({
 }: React.ComponentProps<typeof PopoverPrimitive.Content>) {
   return (
     <PopoverPrimitive.Portal>
-      <PopoverPrimitive.Content align={align} sideOffset={sideOffset} asChild {...props}>
-        <motion.div
-          initial={{ opacity: 0, scale: 0.97, y: -4 }}
-          animate={{ opacity: 1, scale: 1, y: 0 }}
-          transition={{ duration: 0.15, ease: "easeOut" }}
-          className={cn(
-            "z-50 w-72 rounded-xl border border-border bg-popover text-popover-foreground shadow-lg shadow-black/10 outline-none",
-            className,
-          )}
-        >
-          {children}
-        </motion.div>
+      <PopoverPrimitive.Content
+        align={align}
+        sideOffset={sideOffset}
+        className={cn(
+          "z-50 w-72 animate-in rounded-xl border border-border bg-popover text-popover-foreground shadow-lg shadow-black/10 outline-none fade-in-0 zoom-in-95 slide-in-from-top-1 duration-150 ease-out",
+          className,
+        )}
+        {...props}
+      >
+        {children}
       </PopoverPrimitive.Content>
     </PopoverPrimitive.Portal>
   );

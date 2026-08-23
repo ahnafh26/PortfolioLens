@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import { motion } from "framer-motion";
 import { ArrowDownRight, ArrowUpRight, Calculator, Loader2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -96,12 +95,7 @@ export function RebalanceCalculator({ holdings }: Props) {
       {error && <p className="text-sm text-negative">{error}</p>}
 
       {result && (
-        <motion.div
-          initial={{ opacity: 0, y: 6 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.2, ease: "easeOut" }}
-          className="space-y-3"
-        >
+        <div className="animate-in space-y-3 fade-in-0 slide-in-from-top-1 duration-200 ease-out">
           {result.orders.length === 0 ? (
             <p className="text-sm text-muted-foreground">
               Already at target weights, no trades needed.
@@ -160,7 +154,7 @@ export function RebalanceCalculator({ holdings }: Props) {
               Couldn&apos;t fetch a current price for {result.skipped_tickers.join(", ")}, excluded.
             </p>
           )}
-        </motion.div>
+        </div>
       )}
     </div>
   );

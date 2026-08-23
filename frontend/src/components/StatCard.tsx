@@ -1,11 +1,11 @@
 "use client";
 
-import { motion } from "framer-motion";
 import { Info, type LucideIcon } from "lucide-react";
 
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { InfoTooltip } from "@/components/InfoTooltip";
+import { Reveal } from "@/components/Reveal";
 import { useCountUp } from "@/hooks/use-count-up";
 import { cn } from "@/lib/utils";
 
@@ -39,12 +39,7 @@ export function StatCard({ label, value, format, icon: Icon, tone = "auto", hint
       : animated.toFixed(2);
 
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 10 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.3, ease: "easeOut" }}
-      className="min-w-0"
-    >
+    <Reveal className="min-w-0">
       <Card>
         <CardContent className="p-5">
           <div className="flex items-center justify-between">
@@ -64,7 +59,7 @@ export function StatCard({ label, value, format, icon: Icon, tone = "auto", hint
           {hint && <p className="mt-1 text-xs text-muted-foreground">{hint}</p>}
         </CardContent>
       </Card>
-    </motion.div>
+    </Reveal>
   );
 }
 

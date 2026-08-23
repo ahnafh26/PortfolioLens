@@ -1,6 +1,5 @@
 "use client";
 
-import { motion } from "framer-motion";
 import { Check } from "lucide-react";
 
 import { cn } from "@/lib/utils";
@@ -13,11 +12,12 @@ export function AllocationProgress({ totalPct }: { totalPct: number }) {
   return (
     <div className="flex items-center gap-3">
       <div className="h-2 flex-1 overflow-hidden rounded-full bg-muted">
-        <motion.div
-          className={cn("h-full rounded-full", isComplete ? "bg-positive" : "bg-foreground/40")}
-          initial={false}
-          animate={{ width: `${Math.min(totalPct, 100)}%` }}
-          transition={{ duration: 0.25, ease: "easeOut" }}
+        <div
+          className={cn(
+            "h-full rounded-full transition-[width] duration-[250ms] ease-out",
+            isComplete ? "bg-positive" : "bg-foreground/40",
+          )}
+          style={{ width: `${Math.min(totalPct, 100)}%` }}
         />
       </div>
       <span

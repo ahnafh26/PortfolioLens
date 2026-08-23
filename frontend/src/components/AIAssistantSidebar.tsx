@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { AnimatePresence, motion } from "framer-motion";
 import {
   AlertTriangle,
   Check,
@@ -103,16 +102,14 @@ function InsightsSection({
       {!loading && insights && (
         <ul className="space-y-2">
           {insights.map((line, i) => (
-            <motion.li
+            <li
               key={i}
-              initial={{ opacity: 0, y: 4 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.2, delay: i * 0.04 }}
-              className="flex gap-2 text-sm leading-relaxed text-muted-foreground"
+              className="flex animate-in gap-2 text-sm leading-relaxed text-muted-foreground fade-in-0 slide-in-from-bottom-1 duration-200"
+              style={{ animationDelay: `${i * 40}ms` }}
             >
               <Info className="mt-0.5 size-3.5 shrink-0 text-accent" />
               <span>{line}</span>
-            </motion.li>
+            </li>
           ))}
         </ul>
       )}
@@ -171,52 +168,53 @@ function SuggestedAllocationSection({ analysis }: { analysis: AnalyzeResponse })
         </div>
       )}
 
-      <AnimatePresence>
-        {!loading && result && (
-          <motion.div
-            initial={{ opacity: 0, height: 0 }}
-            animate={{ opacity: 1, height: "auto" }}
-            exit={{ opacity: 0, height: 0 }}
-            transition={{ duration: 0.2, ease: "easeOut" }}
-            className="space-y-3 overflow-hidden rounded-lg border border-border bg-muted/50 p-3"
-          >
-            <p className="text-xs text-muted-foreground">{result.rationale}</p>
-            <ul className="space-y-1.5">
-              {Object.entries(result.weights)
-                .sort((a, b) => b[1] - a[1])
-                .map(([ticker, weight]) => (
-                  <li key={ticker} className="flex items-center justify-between text-sm">
-                    <span className="font-medium">{ticker}</span>
-                    <span className="tabular-nums text-muted-foreground">{formatPercent(weight, 0)}</span>
-                  </li>
-                ))}
-            </ul>
-            <Button
-              size="sm"
-              className="w-full"
-              disabled={applied}
-              onClick={() => {
-                applyWeights(result.weights);
-                setApplied(true);
-              }}
-            >
-              {applied ? (
-                <>
-                  <Check className="size-3.5" />
-                  Applied to builder
-                </>
-              ) : (
-                "Apply to portfolio"
-              )}
-            </Button>
-            {applied && (
-              <p className="text-center text-xs text-muted-foreground">
-                Head back to the builder and re-analyze to see the effect.
-              </p>
-            )}
-          </motion.div>
+      <div
+        className={cn(
+          "grid transition-[grid-template-rows] duration-200 ease-out",
+          !loading && result ? "grid-rows-[1fr]" : "grid-rows-[0fr]",
         )}
-      </AnimatePresence>
+      >
+        <div className="overflow-hidden">
+          {result && (
+            <div className="space-y-3 rounded-lg border border-border bg-muted/50 p-3">
+              <p className="text-xs text-muted-foreground">{result.rationale}</p>
+              <ul className="space-y-1.5">
+                {Object.entries(result.weights)
+                  .sort((a, b) => b[1] - a[1])
+                  .map(([ticker, weight]) => (
+                    <li key={ticker} className="flex items-center justify-between text-sm">
+                      <span className="font-medium">{ticker}</span>
+                      <span className="tabular-nums text-muted-foreground">{formatPercent(weight, 0)}</span>
+                    </li>
+                  ))}
+              </ul>
+              <Button
+                size="sm"
+                className="w-full"
+                disabled={applied}
+                onClick={() => {
+                  applyWeights(result.weights);
+                  setApplied(true);
+                }}
+              >
+                {applied ? (
+                  <>
+                    <Check className="size-3.5" />
+                    Applied to builder
+                  </>
+                ) : (
+                  "Apply to portfolio"
+                )}
+              </Button>
+              {applied && (
+                <p className="text-center text-xs text-muted-foreground">
+                  Head back to the builder and re-analyze to see the effect.
+                </p>
+              )}
+            </div>
+          )}
+        </div>
+      </div>
     </section>
   );
 }
@@ -250,39 +248,36 @@ function ResearchRow({ ticker }: { ticker: string }) {
         {ticker}
         <ChevronDown className={cn("size-4 text-muted-foreground transition-transform", open && "rotate-180")} />
       </button>
-      <AnimatePresence initial={false}>
-        {open && (
-          <motion.div
-            initial={{ height: 0, opacity: 0 }}
-            animate={{ height: "auto", opacity: 1 }}
-            exit={{ height: 0, opacity: 0 }}
-            transition={{ duration: 0.2, ease: "easeOut" }}
-            className="overflow-hidden"
-          >
-            <div className="space-y-2 border-t border-border px-3 py-3">
-              {loading && (
-                <div className="space-y-2">
-                  <Skeleton className="h-3.5 w-full" />
-                  <Skeleton className="h-3.5 w-5/6" />
-                </div>
-              )}
-              {!loading && error && <p className="text-xs text-negative">{error}</p>}
-              {!loading && data && (
-                <>
-                  <div className="flex flex-wrap items-center gap-1.5">
-                    <Badge variant="outline" className="text-[10px]">{data.sector}</Badge>
-                    {data.trailing_pe && (
-                      <Badge variant="outline" className="text-[10px]">P/E {data.trailing_pe.toFixed(1)}</Badge>
-                    )}
-                    <SourceBadge source={data.source} />
-                  </div>
-                  <p className="text-xs leading-relaxed text-muted-foreground">{data.summary}</p>
-                </>
-              )}
-            </div>
-          </motion.div>
+      <div
+        className={cn(
+          "grid transition-[grid-template-rows] duration-200 ease-out",
+          open ? "grid-rows-[1fr]" : "grid-rows-[0fr]",
         )}
-      </AnimatePresence>
+      >
+        <div className="overflow-hidden">
+          <div className="space-y-2 border-t border-border px-3 py-3">
+            {loading && (
+              <div className="space-y-2">
+                <Skeleton className="h-3.5 w-full" />
+                <Skeleton className="h-3.5 w-5/6" />
+              </div>
+            )}
+            {!loading && error && <p className="text-xs text-negative">{error}</p>}
+            {!loading && data && (
+              <>
+                <div className="flex flex-wrap items-center gap-1.5">
+                  <Badge variant="outline" className="text-[10px]">{data.sector}</Badge>
+                  {data.trailing_pe && (
+                    <Badge variant="outline" className="text-[10px]">P/E {data.trailing_pe.toFixed(1)}</Badge>
+                  )}
+                  <SourceBadge source={data.source} />
+                </div>
+                <p className="text-xs leading-relaxed text-muted-foreground">{data.summary}</p>
+              </>
+            )}
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
@@ -321,51 +316,49 @@ export function AIAssistantSidebar({
   onInsightsLoaded?: (insights: string[]) => void;
 }) {
   return (
-    <AnimatePresence>
-      {open && (
-        <>
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.2 }}
-            className="fixed inset-0 z-40 bg-black/40 backdrop-blur-[2px]"
-            onClick={() => onOpenChange(false)}
-          />
-          <motion.aside
-            initial={{ x: "100%" }}
-            animate={{ x: 0 }}
-            exit={{ x: "100%" }}
-            transition={{ duration: 0.25, ease: "easeOut" }}
-            className="fixed inset-y-0 right-0 z-50 flex w-full max-w-sm flex-col border-l border-border bg-card shadow-2xl"
-          >
-            <div className="flex items-center justify-between border-b border-border px-4 py-4">
-              <div className="flex items-center gap-2">
-                <Sparkles className="size-4 text-accent" />
-                <h2 className="text-sm font-semibold">AI Portfolio Assistant</h2>
-              </div>
-              <Button variant="ghost" size="icon" onClick={() => onOpenChange(false)} aria-label="Close">
-                <X className="size-4" />
-              </Button>
-            </div>
+    <>
+      <div
+        className={cn(
+          "fixed inset-0 z-40 bg-black/40 backdrop-blur-[2px] transition-opacity duration-200",
+          open ? "opacity-100" : "pointer-events-none opacity-0",
+        )}
+        aria-hidden="true"
+        onClick={() => onOpenChange(false)}
+      />
+      <aside
+        aria-hidden={!open}
+        className={cn(
+          "fixed inset-y-0 right-0 z-50 flex w-full max-w-sm flex-col border-l border-border bg-card shadow-2xl transition-transform duration-[250ms] ease-out",
+          open ? "translate-x-0" : "translate-x-full",
+        )}
+      >
+        <div className="flex items-center justify-between border-b border-border px-4 py-4">
+          <div className="flex items-center gap-2">
+            <Sparkles className="size-4 text-accent" />
+            <h2 className="text-sm font-semibold">AI Portfolio Assistant</h2>
+          </div>
+          <Button variant="ghost" size="icon" onClick={() => onOpenChange(false)} aria-label="Close">
+            <X className="size-4" />
+          </Button>
+        </div>
 
-            <div className="flex-1 space-y-8 overflow-y-auto px-4 py-5">
-              <InsightsSection analysis={analysis} onInsightsLoaded={onInsightsLoaded} />
-              <div className="border-t border-border pt-6">
-                <SuggestedAllocationSection analysis={analysis} />
-              </div>
-              <div className="border-t border-border pt-6">
-                <ResearchSection tickers={analysis.holdings.map((h) => h.ticker)} />
-              </div>
+        {open && (
+          <div className="flex-1 space-y-8 overflow-y-auto px-4 py-5">
+            <InsightsSection analysis={analysis} onInsightsLoaded={onInsightsLoaded} />
+            <div className="border-t border-border pt-6">
+              <SuggestedAllocationSection analysis={analysis} />
             </div>
+            <div className="border-t border-border pt-6">
+              <ResearchSection tickers={analysis.holdings.map((h) => h.ticker)} />
+            </div>
+          </div>
+        )}
 
-            <div className="flex items-start gap-2 border-t border-border px-4 py-3 text-[11px] text-muted-foreground">
-              <AlertTriangle className="mt-0.5 size-3 shrink-0" />
-              General analytics, not personalized financial advice.
-            </div>
-          </motion.aside>
-        </>
-      )}
-    </AnimatePresence>
+        <div className="flex items-start gap-2 border-t border-border px-4 py-3 text-[11px] text-muted-foreground">
+          <AlertTriangle className="mt-0.5 size-3 shrink-0" />
+          General analytics, not personalized financial advice.
+        </div>
+      </aside>
+    </>
   );
 }
