@@ -1,7 +1,24 @@
 """Request/response models for the API. Kept in one file so the frontend types stay in sync."""
 from __future__ import annotations
 
+import re
+from datetime import date, datetime, timedelta
+
 from pydantic import BaseModel, Field, field_validator, model_validator
+
+# real-world symbols look like AAPL, BRK.B, BF-B -- this also keeps ticker strings out of
+# reach of CSV-formula-injection payloads (=, @, ...) and yfinance requests built from junk input
+_TICKER_PATTERN = re.compile(r"^[A-Z0-9.\-]{1,10}$")
+
+MAX_BACKTEST_YEARS = 20
+_EARLIEST_BACKTEST_DATE = date(1970, 1, 1)
+
+
+def _validate_ticker(v: str) -> str:
+    upper = v.strip().upper()
+    if not _TICKER_PATTERN.match(upper):
+        raise ValueError(f"'{v}' is not a valid ticker symbol")
+    return upper
 
 
 class HoldingInput(BaseModel):
@@ -11,7 +28,7 @@ class HoldingInput(BaseModel):
     @field_validator("ticker")
     @classmethod
     def _uppercase_ticker(cls, v: str) -> str:
-        return v.strip().upper()
+        return _validate_ticker(v)
 
 
 class HoldingsRequestBase(BaseModel):
@@ -56,8 +73,17 @@ class PortfolioStats(BaseModel):
 
 
 class CorrelationMatrix(BaseModel):
-    tickers: list[str]
-    matrix: list[list[float]] = Field(..., description="Row-major matrix; matrix[i][j] is the correlation between tickers[i] and tickers[j]")
+    tickers: list[str] = Field(..., max_length=25)
+    matrix: list[list[float]] = Field(..., max_length=25, description="Row-major matrix; matrix[i][j] is the correlation between tickers[i] and tickers[j]")
+
+    @field_validator("matrix")
+    @classmethod
+    def _rows_bounded(cls, v: list[list[float]]) -> list[list[float]]:
+        # AnalyzeResponse.correlation is client-supplied at export time (see ExportRequest);
+        # bound each row too, not just the row count, so a huge matrix can't sneak in sideways
+        if any(len(row) > 25 for row in v):
+            raise ValueError("Correlation matrix rows must have at most 25 entries")
+        return v
 
 
 class FrontierPoint(BaseModel):
@@ -73,7 +99,7 @@ class OptimalPortfolio(BaseModel):
 
 
 class EfficientFrontier(BaseModel):
-    points: list[FrontierPoint]
+    points: list[FrontierPoint] = Field(..., max_length=200)
     user_portfolio: FrontierPoint
     max_sharpe: OptimalPortfolio
     min_volatility: OptimalPortfolio
@@ -92,31 +118,31 @@ class MonteCarloBand(BaseModel):
 
 class MonteCarloResult(BaseModel):
     starting_value: float = Field(..., description="Normalized starting portfolio value (always 1.0 == 100%)")
-    bands: list[MonteCarloBand]
+    bands: list[MonteCarloBand] = Field(..., max_length=200)
     value_at_risk_95: float = Field(..., description="1-year 95% VaR as a fraction of starting value")
 
 
 class BreakdownSlice(BaseModel):
-    label: str
+    label: str = Field(..., max_length=100)
     weight: float
 
 
 class FactorBreakdown(BaseModel):
     """Sector/cap composition, plus concentration warnings (>50% in one bucket)."""
 
-    sector: list[BreakdownSlice]
-    market_cap: list[BreakdownSlice]
-    concentration_warnings: list[BreakdownSlice]
+    sector: list[BreakdownSlice] = Field(..., max_length=50)
+    market_cap: list[BreakdownSlice] = Field(..., max_length=50)
+    concentration_warnings: list[BreakdownSlice] = Field(..., max_length=50)
 
 
 class AnalyzeResponse(BaseModel):
-    holdings: list[HoldingStats]
+    holdings: list[HoldingStats] = Field(..., max_length=25)
     portfolio: PortfolioStats
     correlation: CorrelationMatrix
     efficient_frontier: EfficientFrontier
     monte_carlo: MonteCarloResult
     factor_breakdown: FactorBreakdown
-    skipped_tickers: list[str] = Field(default_factory=list, description="Tickers that were requested but couldn't be resolved to price data")
+    skipped_tickers: list[str] = Field(default_factory=list, max_length=25, description="Tickers that were requested but couldn't be resolved to price data")
     lookback_years: int
 
 
@@ -146,10 +172,32 @@ class BacktestRequest(HoldingsRequestBase):
             raise ValueError(f"Unknown period '{v}'")
         return v
 
+    @field_validator("start_date", "end_date")
+    @classmethod
+    def _valid_date_format(cls, v: str | None) -> str | None:
+        if v is None:
+            return v
+        try:
+            parsed = datetime.strptime(v, "%Y-%m-%d").date()
+        except ValueError as exc:
+            raise ValueError(f"'{v}' is not a valid YYYY-MM-DD date") from exc
+        if parsed < _EARLIEST_BACKTEST_DATE or parsed > date.today():
+            raise ValueError(f"'{v}' is outside the supported date range ({_EARLIEST_BACKTEST_DATE} to today)")
+        return v
+
     @model_validator(mode="after")
     def _custom_period_requires_dates(self) -> "BacktestRequest":
-        if self.period == "custom" and (not self.start_date or not self.end_date):
+        if self.period != "custom":
+            return self
+        if not self.start_date or not self.end_date:
             raise ValueError("start_date and end_date are required when period is 'custom'")
+
+        start = datetime.strptime(self.start_date, "%Y-%m-%d").date()
+        end = datetime.strptime(self.end_date, "%Y-%m-%d").date()
+        if start >= end:
+            raise ValueError("start_date must be before end_date")
+        if end - start > timedelta(days=365 * MAX_BACKTEST_YEARS):
+            raise ValueError(f"Custom backtest range can't exceed {MAX_BACKTEST_YEARS} years")
         return self
 
 
@@ -170,14 +218,14 @@ class BacktestResponse(BaseModel):
 
 
 class CurrentHolding(BaseModel):
-    ticker: str
+    ticker: str = Field(..., min_length=1, max_length=10)
     weight: float = Field(..., gt=0, le=1, description="Target weight, e.g. 0.25 for 25%")
     current_value: float = Field(default=0.0, ge=0, description="Current dollar value already held in this ticker (0 if starting fresh)")
 
     @field_validator("ticker")
     @classmethod
     def _uppercase_ticker(cls, v: str) -> str:
-        return v.strip().upper()
+        return _validate_ticker(v)
 
 
 class RebalanceRequest(BaseModel):
@@ -243,14 +291,14 @@ class TickerResearchResponse(BaseModel):
 
 
 class HoldingPerformance(BaseModel):
-    ticker: str
+    ticker: str = Field(..., min_length=1, max_length=10)
     annual_return: float
     annual_volatility: float
 
     @field_validator("ticker")
     @classmethod
     def _uppercase_ticker(cls, v: str) -> str:
-        return v.strip().upper()
+        return _validate_ticker(v)
 
 
 class SuggestedAllocationRequest(BaseModel):
@@ -275,11 +323,18 @@ class ExportRequest(BaseModel):
     """Re-formats an already-computed analysis, doesn't re-run one."""
 
     analysis: AnalyzeResponse
-    ai_insights: list[str] | None = None
+    ai_insights: list[str] | None = Field(default=None, max_length=50)
+
+    @field_validator("ai_insights")
+    @classmethod
+    def _insight_lines_bounded(cls, v: list[str] | None) -> list[str] | None:
+        if v is not None and any(len(line) > 2000 for line in v):
+            raise ValueError("Each AI insight line must be at most 2000 characters")
+        return v
 
 
 class ShockSimulationRequest(HoldingsRequestBase):
-    origin_ticker: str = Field(..., description="Ticker where the price shock originates, e.g. AAPL")
+    origin_ticker: str = Field(..., min_length=1, max_length=10, description="Ticker where the price shock originates, e.g. AAPL")
     shock_magnitude: float = Field(
         ..., lt=0, ge=-1, description="Percentage price drop at the origin, expressed as a negative fraction, e.g. -0.15 for -15%"
     )
@@ -291,7 +346,7 @@ class ShockSimulationRequest(HoldingsRequestBase):
     @field_validator("origin_ticker")
     @classmethod
     def _uppercase_origin(cls, v: str) -> str:
-        return v.strip().upper()
+        return _validate_ticker(v)
 
     @model_validator(mode="after")
     def _origin_is_a_holding(self) -> "ShockSimulationRequest":

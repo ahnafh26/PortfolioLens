@@ -4,6 +4,7 @@ from __future__ import annotations
 from fastapi.testclient import TestClient
 
 from app.main import app
+from app.models import HoldingInput
 
 client = TestClient(app)
 
@@ -89,6 +90,132 @@ def test_ticker_search_is_rate_limited_per_ip():
     response = client.get("/api/tickers/search", params={"q": "AAPL"})
     assert response.status_code == 429
 
+
+# ticker format validation (also closes off CSV-formula-injection and yfinance-request-abuse paths)
+
+def test_analyze_rejects_ticker_with_formula_injection_characters():
+    response = client.post(
+        "/api/portfolio/analyze",
+        json={"holdings": [{"ticker": "=CMD|'/C calc'!A1", "weight": 1.0}], "lookback_years": 5},
+    )
+    assert response.status_code == 422
+
+
+def test_analyze_rejects_ticker_with_script_tag():
+    response = client.post(
+        "/api/portfolio/analyze",
+        json={"holdings": [{"ticker": "<script>", "weight": 1.0}], "lookback_years": 5},
+    )
+    assert response.status_code == 422
+
+
+def test_holding_input_accepts_real_world_ticker_formats():
+    """BRK.B / BF-B style symbols (dot/hyphen) must still pass; this is what the ticker
+    regex is actually there to allow, not just what it rejects. Checked against the model
+    directly, not through /analyze, since that would need a real yfinance lookup to reach 200."""
+    assert HoldingInput(ticker="BRK.B", weight=1.0).ticker == "BRK.B"
+    assert HoldingInput(ticker="bf-b", weight=1.0).ticker == "BF-B"
+
+
+# custom backtest date validation
+
+def test_backtest_rejects_malformed_date_format():
+    response = client.post(
+        "/api/portfolio/backtest",
+        json={
+            "holdings": [{"ticker": "AAPL", "weight": 1.0}],
+            "period": "custom",
+            "start_date": "not-a-date",
+            "end_date": "2020-01-01",
+        },
+    )
+    assert response.status_code == 422
+
+
+def test_backtest_rejects_start_date_after_end_date():
+    response = client.post(
+        "/api/portfolio/backtest",
+        json={
+            "holdings": [{"ticker": "AAPL", "weight": 1.0}],
+            "period": "custom",
+            "start_date": "2020-06-01",
+            "end_date": "2020-01-01",
+        },
+    )
+    assert response.status_code == 422
+
+
+def test_backtest_rejects_a_future_date():
+    response = client.post(
+        "/api/portfolio/backtest",
+        json={
+            "holdings": [{"ticker": "AAPL", "weight": 1.0}],
+            "period": "custom",
+            "start_date": "2020-01-01",
+            "end_date": "2999-01-01",
+        },
+    )
+    assert response.status_code == 422
+
+
+def test_backtest_rejects_a_range_over_the_max_years():
+    response = client.post(
+        "/api/portfolio/backtest",
+        json={
+            "holdings": [{"ticker": "AAPL", "weight": 1.0}],
+            "period": "custom",
+            "start_date": "1970-01-01",
+            "end_date": "2020-01-01",
+        },
+    )
+    assert response.status_code == 422
+
+
+# export payload bounds (ExportRequest.ai_insights is raw client input, not re-derived)
+
+def _sample_export_analysis() -> dict:
+    return {
+        "holdings": [{"ticker": "AAPL", "weight": 1.0, "annual_return": 0.1, "annual_volatility": 0.2, "sharpe_ratio": 0.5}],
+        "portfolio": {"annual_return": 0.1, "annual_volatility": 0.2, "sharpe_ratio": 0.5, "value_at_risk_95": 0.1},
+        "correlation": {"tickers": ["AAPL"], "matrix": [[1.0]]},
+        "efficient_frontier": {
+            "points": [{"annual_return": 0.1, "annual_volatility": 0.2}],
+            "user_portfolio": {"annual_return": 0.1, "annual_volatility": 0.2},
+            "max_sharpe": {"annual_return": 0.1, "annual_volatility": 0.2, "sharpe_ratio": 0.5, "weights": {"AAPL": 1.0}},
+            "min_volatility": {"annual_return": 0.1, "annual_volatility": 0.2, "sharpe_ratio": 0.5, "weights": {"AAPL": 1.0}},
+        },
+        "monte_carlo": {"starting_value": 1.0, "bands": [{"day": 0, "p5": 1.0, "p25": 1.0, "p50": 1.0, "p75": 1.0, "p95": 1.0}], "value_at_risk_95": 0.1},
+        "factor_breakdown": {"sector": [], "market_cap": [], "concentration_warnings": []},
+        "skipped_tickers": [],
+        "lookback_years": 5,
+    }
+
+
+def test_export_rejects_more_than_fifty_ai_insight_lines():
+    response = client.post(
+        "/api/portfolio/export/csv",
+        json={"analysis": _sample_export_analysis(), "ai_insights": ["note"] * 51},
+    )
+    assert response.status_code == 422
+
+
+def test_export_rejects_an_overlong_ai_insight_line():
+    response = client.post(
+        "/api/portfolio/export/csv",
+        json={"analysis": _sample_export_analysis(), "ai_insights": ["x" * 2001]},
+    )
+    assert response.status_code == 422
+
+
+def test_export_accepts_a_normal_ai_insights_payload():
+    response = client.post(
+        "/api/portfolio/export/csv",
+        json={"analysis": _sample_export_analysis(), "ai_insights": ["Diversify more."]},
+    )
+    assert response.status_code == 200
+
+
+# global request body size limit
 
 def test_oversized_request_body_is_rejected_with_413():
     payload = b'{"holdings": [{"ticker": "AAPL", "weight": 1.0}], "lookback_years": 5, "padding": "' + b"a" * (2 * 1024 * 1024) + b'"}'

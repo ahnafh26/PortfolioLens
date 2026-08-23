@@ -4,6 +4,7 @@ from __future__ import annotations
 import csv
 import io
 from datetime import datetime, timezone
+from xml.sax.saxutils import escape as xml_escape
 
 from reportlab.lib import colors
 from reportlab.lib.pagesizes import letter
@@ -14,6 +15,15 @@ from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer, Table, Tabl
 from app.models import AnalyzeResponse
 
 _TIMESTAMP_FORMAT = "%Y-%m-%d %H:%M UTC"
+
+# ai_insights/tickers/labels ultimately trace back to client input (export requests
+# aren't tied to a prior real /analyze call). Prefix formula-trigger characters so
+# Excel/Sheets can't execute them as formulas when someone opens the export.
+_CSV_FORMULA_TRIGGERS = ("=", "+", "-", "@", "\t", "\r")
+
+
+def _csv_safe(value: str) -> str:
+    return f"'{value}" if value.startswith(_CSV_FORMULA_TRIGGERS) else value
 
 
 def _timestamp() -> str:
@@ -39,29 +49,29 @@ def generate_csv(analysis: AnalyzeResponse, ai_insights: list[str] | None = None
     writer.writerow(["Holdings"])
     writer.writerow(["Ticker", "Weight", "Annual Return", "Annual Volatility", "Sharpe Ratio"])
     for h in analysis.holdings:
-        writer.writerow([h.ticker, f"{h.weight:.4f}", f"{h.annual_return:.4f}", f"{h.annual_volatility:.4f}", f"{h.sharpe_ratio:.4f}"])
+        writer.writerow([_csv_safe(h.ticker), f"{h.weight:.4f}", f"{h.annual_return:.4f}", f"{h.annual_volatility:.4f}", f"{h.sharpe_ratio:.4f}"])
     writer.writerow([])
 
     writer.writerow(["Sector Breakdown"])
     writer.writerow(["Sector", "Weight"])
     for s in analysis.factor_breakdown.sector:
-        writer.writerow([s.label, f"{s.weight:.4f}"])
+        writer.writerow([_csv_safe(s.label), f"{s.weight:.4f}"])
     writer.writerow([])
 
     writer.writerow(["Market Cap Breakdown"])
     writer.writerow(["Tier", "Weight"])
     for s in analysis.factor_breakdown.market_cap:
-        writer.writerow([s.label, f"{s.weight:.4f}"])
+        writer.writerow([_csv_safe(s.label), f"{s.weight:.4f}"])
 
     if analysis.skipped_tickers:
         writer.writerow([])
-        writer.writerow(["Skipped tickers (no usable price data)", ", ".join(analysis.skipped_tickers)])
+        writer.writerow(["Skipped tickers (no usable price data)", _csv_safe(", ".join(analysis.skipped_tickers))])
 
     if ai_insights:
         writer.writerow([])
         writer.writerow(["AI Assistant Insights"])
         for line in ai_insights:
-            writer.writerow([line])
+            writer.writerow([_csv_safe(line)])
 
     return buf.getvalue().encode("utf-8")
 
@@ -170,12 +180,13 @@ def generate_pdf(analysis: AnalyzeResponse, ai_insights: list[str] | None = None
 
     if analysis.skipped_tickers:
         story.append(Paragraph("Notes", heading_style))
-        story.append(Paragraph(f"Skipped (no usable price data): {', '.join(analysis.skipped_tickers)}", body_style))
+        skipped = xml_escape(", ".join(analysis.skipped_tickers))
+        story.append(Paragraph(f"Skipped (no usable price data): {skipped}", body_style))
 
     if ai_insights:
         story.append(Paragraph("AI Assistant Insights", heading_style))
         for line in ai_insights:
-            story.append(Paragraph(f"&bull; {line}", body_style))
+            story.append(Paragraph(f"&bull; {xml_escape(line)}", body_style))
 
     doc.build(story)
     return buf.getvalue()

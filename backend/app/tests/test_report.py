@@ -64,4 +64,37 @@ def test_generate_pdf_produces_a_valid_pdf_document():
     pdf_bytes = generate_pdf(_sample_analysis())
     assert pdf_bytes.startswith(b"%PDF")
 
-# TODO: cover the ai_insights path for both formats once report.py settles down
+
+def test_generate_csv_includes_ai_insights():
+    csv_bytes = generate_csv(_sample_analysis(), ai_insights=["Diversify more.", "Watch tech exposure."])
+    text = csv_bytes.decode("utf-8")
+
+    assert "Diversify more." in text
+    assert "Watch tech exposure." in text
+
+
+def test_generate_csv_neutralizes_formula_injection_in_ai_insights():
+    """ai_insights is client-supplied at export time, not re-derived server-side, so a
+    line starting with =/+/-/@ must not reach the file as an executable spreadsheet formula."""
+    csv_bytes = generate_csv(_sample_analysis(), ai_insights=["=cmd|' /C calc'!A1", "+1+1", "-1+1", "@SUM(1,1)"])
+    text = csv_bytes.decode("utf-8")
+
+    for line in text.splitlines():
+        assert not line.startswith(("=", "+", "-", "@"))
+
+
+def test_generate_csv_neutralizes_formula_injection_in_skipped_tickers():
+    analysis = _sample_analysis()
+    analysis = analysis.model_copy(update={"skipped_tickers": ["=cmd|' /C calc'!A1"]})
+
+    csv_bytes = generate_csv(analysis)
+    text = csv_bytes.decode("utf-8")
+
+    assert "'=cmd" in text
+
+
+def test_generate_pdf_handles_ai_insights_with_markup_characters():
+    """ai_insights text flows into reportlab's Paragraph, which parses a pseudo-XML markup
+    language; unescaped '<'/'&' must not break generation or inject unintended markup."""
+    pdf_bytes = generate_pdf(_sample_analysis(), ai_insights=["<b>bold</b> & <script>alert(1)</script>"])
+    assert pdf_bytes.startswith(b"%PDF")
