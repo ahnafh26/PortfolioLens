@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24">
+  <style>
+    :root { --mark: #a97c50; --line: #1a2332; }
+    @media (prefers-color-scheme: dark) {
+      :root { --mark: #c79968; --line: #f4f1ec; }
+    }
+  </style>
+  <circle cx="10" cy="10" r="6.25" fill="none" stroke="var(--mark)" stroke-width="2.25" />
+  <line x1="14.42" y1="14.42" x2="19.5" y2="19.5" stroke="var(--mark)" stroke-width="2.25" stroke-linecap="round" />
+  <polyline points="4.5,13 11,11.5 16,4" fill="none" stroke="var(--line)" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round" />
+  <circle cx="16" cy="4" r="1.6" fill="var(--line)" />
+</svg>
