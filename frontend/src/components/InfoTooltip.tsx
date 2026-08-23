@@ -1,50 +1,42 @@
 "use client";
 
-import * as React from "react";
-import * as PopoverPrimitive from "@radix-ui/react-popover";
-import { motion } from "framer-motion";
+import type { ReactNode } from "react";
 
 import { cn } from "@/lib/utils";
 
+// CSS-only hover/focus, not JS pointer-event state: the browser tracks :hover and
+// :focus-within itself, so this can never get stuck open the way a manually
+// controlled Radix Popover could when a pointerleave was missed.
 export function InfoTooltip({
   text,
   children,
   className,
 }: {
   text: string;
-  children: React.ReactNode;
+  children: ReactNode;
   className?: string;
 }) {
-  const [open, setOpen] = React.useState(false);
-
   return (
-    <PopoverPrimitive.Root open={open} onOpenChange={setOpen}>
-      <PopoverPrimitive.Trigger asChild>
-        <button
-          type="button"
-          aria-label={text}
-          className={cn("inline-flex shrink-0 align-middle text-muted-foreground/70 transition-colors hover:text-muted-foreground", className)}
-          // don't add onClick, Radix already toggles it and doubling up breaks tap-to-open on mobile
-          onMouseEnter={() => setOpen(true)}
-          onMouseLeave={() => setOpen(false)}
-          onFocus={() => setOpen(true)}
-          onBlur={() => setOpen(false)}
-        >
-          {children}
-        </button>
-      </PopoverPrimitive.Trigger>
-      <PopoverPrimitive.Portal>
-        <PopoverPrimitive.Content side="top" align="center" sideOffset={6} asChild onOpenAutoFocus={(e) => e.preventDefault()}>
-          <motion.div
-            initial={{ opacity: 0, scale: 0.97, y: 2 }}
-            animate={{ opacity: 1, scale: 1, y: 0 }}
-            transition={{ duration: 0.12, ease: "easeOut" }}
-            className="z-50 max-w-56 rounded-md border border-border bg-popover px-2.5 py-1.5 text-xs leading-snug text-popover-foreground shadow-md outline-none"
-          >
-            {text}
-          </motion.div>
-        </PopoverPrimitive.Content>
-      </PopoverPrimitive.Portal>
-    </PopoverPrimitive.Root>
+    <span className="group/tooltip relative inline-flex">
+      <button
+        type="button"
+        aria-label={text}
+        className={cn(
+          "inline-flex shrink-0 align-middle text-muted-foreground/70 transition-colors hover:text-muted-foreground",
+          className,
+        )}
+        onKeyDown={(e) => {
+          if (e.key === "Escape") e.currentTarget.blur();
+        }}
+      >
+        {children}
+      </button>
+      <span
+        aria-hidden="true"
+        className="pointer-events-none absolute bottom-full left-1/2 z-50 mb-1.5 w-max max-w-56 -translate-x-1/2 scale-95 rounded-md border border-border bg-popover px-2.5 py-1.5 text-xs leading-snug text-popover-foreground opacity-0 shadow-md transition-[opacity,transform] duration-100 ease-out group-hover/tooltip:scale-100 group-hover/tooltip:opacity-100 group-focus-within/tooltip:scale-100 group-focus-within/tooltip:opacity-100"
+      >
+        {text}
+      </span>
+    </span>
   );
 }
