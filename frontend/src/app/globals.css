@@ -1,0 +1,162 @@
+@import "tailwindcss";
+@plugin "tailwindcss-animate";
+
+/* Popover uses Framer Motion directly (see components/ui/popover.tsx).
+ * Select/Dialog use tailwindcss-animate's data-state-driven keyframes
+ * instead, since Radix's Select Portal/Viewport does its own internal
+ * position measurement that fights being wrapped in a motion.div. */
+
+/* ---------------------------------------------------------------------------
+ * Design tokens
+ *
+ * Five neutrals + one accent, per the PortfolioLens design system. The raw
+ * palette (--color-ink/-ink-soft/-paper plus the accent and gain/loss pair)
+ * is fixed and does not vary by theme. Light/dark mode is produced by
+ * swapping which raw neutral the *semantic* slots (background, foreground,
+ * ring, ...) point to -- ink and paper trade places, muted/border/ink-soft
+ * hold their position. Accent is brass, reserved for a single emphasis
+ * element per screen -- never a button fill or card border.
+ * ------------------------------------------------------------------------- */
+:root {
+  --radius: 2px;
+
+  /* Raw palette. Fixed values -- these do not vary by theme. */
+  --ink: #2c3e50;
+  --ink-soft: #34495e;
+  --muted-tone: #7f8c8d;
+  --border-tone: #bdc3c7;
+  --paper: #ecf0f1;
+  --accent-tone: #8c6a3a;
+  --gain: #3f7a5d;
+  --loss: #a3433a;
+
+  --background: var(--paper);
+  --foreground: var(--ink);
+
+  /* Cards sit on the same surface as the page -- elevation comes from the
+   * 1px hairline border, not a background shift or drop shadow. */
+  --card: var(--paper);
+  --card-foreground: var(--ink);
+
+  --popover: var(--paper);
+  --popover-foreground: var(--ink);
+
+  --muted: var(--border-tone);
+  --muted-foreground: var(--muted-tone);
+
+  --border: var(--border-tone);
+  --input: var(--border-tone);
+  --ring: var(--ink-soft);
+
+  --accent: var(--accent-tone);
+  --accent-foreground: var(--paper);
+
+  --positive: var(--gain);
+  --negative: var(--loss);
+
+  --secondary: var(--border-tone);
+  --secondary-foreground: var(--ink);
+
+  /* Wordmark logo only -- its own two-tone palette, distinct from the
+   * scarce site --accent (see "Accent is scarce by design" above). These
+   * are the only tokens in this file that exist purely for one glyph. */
+  --logo-mark: #a97c50;
+  --logo-line: #1a2332;
+}
+
+.dark {
+  --background: var(--ink);
+  --foreground: var(--paper);
+
+  --card: var(--ink);
+  --card-foreground: var(--paper);
+
+  --popover: var(--ink);
+  --popover-foreground: var(--paper);
+
+  /* Ink-soft only earns its keep as a fill in dark mode: a whisper lighter
+   * than the page background for subtle panel/skeleton surfaces. It's too
+   * close in lightness to ink to ever work as dark-mode text. */
+  --muted: var(--ink-soft);
+  --muted-foreground: var(--muted-tone);
+
+  --border: var(--border-tone);
+  --input: var(--border-tone);
+  --ring: var(--border-tone);
+
+  --accent: var(--accent-tone);
+  --accent-foreground: var(--paper);
+
+  --positive: var(--gain);
+  --negative: var(--loss);
+
+  --secondary: var(--ink-soft);
+  --secondary-foreground: var(--paper);
+
+  --logo-mark: #c79968;
+  --logo-line: #f4f1ec;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-positive: var(--positive);
+  --color-negative: var(--negative);
+
+  /* Raw neutrals, for the rare component that needs a fixed (non-theme-
+   * swapped) tone -- e.g. a graph node fill -- rather than the adaptive
+   * background/foreground pair above. */
+  --color-ink: var(--ink);
+  --color-ink-soft: var(--ink-soft);
+  --color-paper: var(--paper);
+  --color-logo-mark: var(--logo-mark);
+  --color-logo-line: var(--logo-line);
+
+  /* 2px radius everywhere, no exceptions -- no scale to pick from. */
+  --radius-sm: var(--radius);
+  --radius-md: var(--radius);
+  --radius-lg: var(--radius);
+  --radius-xl: var(--radius);
+
+  --font-display: var(--font-eb-garamond);
+  --font-sans: var(--font-source-serif-4);
+  --font-mono: var(--font-ibm-plex-mono);
+}
+
+@layer base {
+  * {
+    border-color: var(--color-border);
+    outline-color: var(--color-ring);
+  }
+
+  body {
+    background: var(--color-background);
+    color: var(--color-foreground);
+  }
+
+  /* Every financial figure in the app renders with tabular-nums so that
+   * columns of stats/prices line up on their digits instead of jittering
+   * as digit widths vary (proportional "1"s and "8"s are different widths
+   * in most fonts). */
+  .tabular-nums,
+  .font-financial {
+    font-variant-numeric: tabular-nums;
+  }
+}
+
+/* text-positive, bg-positive/10, border-accent, etc. all come for free --
+ * Tailwind v4 generates the full utility set for every --color-* token
+ * registered in @theme above, opacity modifiers included. */
