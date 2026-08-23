@@ -53,7 +53,6 @@ def fetch_company_profile(ticker: str) -> CompanyProfile:
         return CompanyProfile(symbol=ticker, name=ticker, is_fund=False, sector=_UNKNOWN, market_cap_bucket=_UNKNOWN)
 
     is_fund = info.get("quoteType") in ("ETF", "MUTUALFUND")
-    # funds don't get a sector from yfinance, use category instead
     sector = (info.get("category") if is_fund else info.get("sector")) or _UNKNOWN
 
     name = info.get("longName") or info.get("shortName") or ticker

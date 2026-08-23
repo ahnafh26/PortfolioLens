@@ -25,11 +25,9 @@ class InsufficientDataError(Exception):
     pass
 
 
-# 1. Price history
-
 @cached_call(PRICE_HISTORY_CACHE, key_prefix="price_history")
 def _fetch_single_ticker_closes(ticker: str, period: str) -> pd.Series | None:
-    """One ticker's adjusted-close series, or None if unusable. Cached so repeat requests don't re-hit yfinance."""
+    """Cached so repeat requests don't re-hit yfinance."""
     try:
         history = yf.Ticker(ticker).history(period=period, auto_adjust=True)
     except Exception as exc:  # yfinance raises a mix of exception types depending on the failure
@@ -77,26 +75,19 @@ def fetch_price_history(tickers: list[str], years: int) -> tuple[pd.DataFrame, l
     return prices, skipped
 
 
-# 2. Returns
-
 def compute_returns(prices: pd.DataFrame) -> pd.DataFrame:
-    # simple returns, not log (these aggregate linearly across holdings, frontier math needs that)
+    # Simple returns, not log, so they stay linear for portfolio_return = weights . returns.
     return prices.pct_change().dropna(how="all")
 
 
-# 3. Annualization
-
 def annualize_return(daily_returns: pd.Series | np.ndarray) -> float:
-    # arithmetic mean, not geometric, keeps portfolio_return = weights . returns linear
+    # Keep expected returns linear for portfolio optimization (arithmetic, not geometric, mean).
     return float(np.mean(daily_returns)) * TRADING_DAYS_PER_YEAR
 
 
 def annualize_volatility(daily_returns: pd.Series | np.ndarray) -> float:
-    # sqrt(time) rule
     return float(np.std(daily_returns, ddof=1)) * np.sqrt(TRADING_DAYS_PER_YEAR)
 
-
-# 4. Sharpe ratio
 
 def sharpe_ratio(annual_return: float, annual_vol: float, risk_free_rate: float = DEFAULT_RISK_FREE_RATE) -> float:
     if annual_vol == 0:
@@ -104,13 +95,9 @@ def sharpe_ratio(annual_return: float, annual_vol: float, risk_free_rate: float 
     return (annual_return - risk_free_rate) / annual_vol
 
 
-# 5. Correlation
-
 def correlation_matrix(returns: pd.DataFrame) -> pd.DataFrame:
     return returns.corr()
 
-
-# 6. Efficient frontier
 
 @dataclass
 class OptimalPortfolioResult:
@@ -132,7 +119,6 @@ def _portfolio_return(weights: np.ndarray, mean_returns: np.ndarray) -> float:
 
 
 def _portfolio_volatility(weights: np.ndarray, cov_matrix: np.ndarray) -> float:
-    # w^T . Cov . w
     variance = weights @ cov_matrix @ weights
     return float(np.sqrt(max(variance, 0.0)))
 
@@ -144,7 +130,7 @@ def _solve_min_volatility(
     target_return: float | None,
 ) -> np.ndarray | None:
     """Min-volatility weights, long-only, summing to 1, optionally hitting an exact target return."""
-    x0 = np.full(n_assets, 1.0 / n_assets)  # equal-weight start
+    x0 = np.full(n_assets, 1.0 / n_assets)
     bounds = [(0.0, 1.0)] * n_assets  # long-only
 
     constraints = [{"type": "eq", "fun": lambda w: np.sum(w) - 1.0}]
@@ -241,8 +227,6 @@ def efficient_frontier(
         min_volatility=to_result(min_vol_weights),
     )
 
-
-# 7. Monte Carlo simulation
 
 @dataclass
 class MonteCarloBandResult:

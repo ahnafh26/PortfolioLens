@@ -126,7 +126,7 @@ def run_backtest(
     risk_free_rate: float = DEFAULT_RISK_FREE_RATE,
 ) -> BacktestResult:
     # benchmark fetched alongside holdings so it goes through the same date-align join
-    all_tickers = list(dict.fromkeys([*tickers, benchmark_ticker]))  # dedupe, preserve order
+    all_tickers = list(dict.fromkeys([*tickers, benchmark_ticker]))
     prices, skipped = fetch_price_history_range(all_tickers, start, end)
 
     if benchmark_ticker not in prices.columns:

@@ -10,13 +10,10 @@ import {
   type UTCTimestamp,
 } from "lightweight-charts";
 
-import { sequentialBlue, status, chartInk } from "@/lib/chart-colors";
+import { sequentialBlue, status, chartInk, chartSurface, chartFontFamily } from "@/lib/chart-colors";
 import { useChartTheme } from "@/hooks/use-chart-theme";
 import type { MonteCarloResult } from "@/lib/api";
 import { TRADING_DAYS_PER_YEAR, formatGrowthMultiple } from "@/lib/format";
-
-// canvas needs a literal color, not a CSS var - matches the --card token
-const CHART_SURFACE = { light: "#ffffff", dark: "#232329" };
 
 // fake epoch so the time scale has real timestamps to work with; we
 // relabel ticks as "Yr N" below instead of showing calendar dates
@@ -44,7 +41,7 @@ export function MonteCarloChart({ result }: { result: MonteCarloResult }) {
     const outerBand = ramp[0];
     const innerBand = ramp[2];
     const medianColor = ramp[4];
-    const surface = CHART_SURFACE[mode];
+    const surface = chartSurface[mode];
     const ink = chartInk.secondary[mode];
     const grid = chartInk.gridline[mode];
 
@@ -54,7 +51,7 @@ export function MonteCarloChart({ result }: { result: MonteCarloResult }) {
       layout: {
         background: { color: surface },
         textColor: ink,
-        fontFamily: "var(--font-inter), system-ui, sans-serif",
+        fontFamily: chartFontFamily,
         // was colliding with the VaR price-line label
         attributionLogo: false,
       },

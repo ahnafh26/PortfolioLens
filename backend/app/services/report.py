@@ -20,8 +20,6 @@ def _timestamp() -> str:
     return datetime.now(timezone.utc).strftime(_TIMESTAMP_FORMAT)
 
 
-# CSV
-
 def generate_csv(analysis: AnalyzeResponse, ai_insights: list[str] | None = None) -> bytes:
     buf = io.StringIO()
     writer = csv.writer(buf)
@@ -67,8 +65,6 @@ def generate_csv(analysis: AnalyzeResponse, ai_insights: list[str] | None = None
 
     return buf.getvalue().encode("utf-8")
 
-
-# PDF
 
 _ACCENT = colors.HexColor("#059669")  # frontend's accent green
 _MUTED = colors.HexColor("#6b7280")

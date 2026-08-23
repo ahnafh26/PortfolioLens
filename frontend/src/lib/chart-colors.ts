@@ -35,6 +35,11 @@ export const chartInk = {
   gridline: { light: "#e1e0d9", dark: "#2c2c2a" },
 };
 
+// canvas needs a literal color, not a CSS var - matches the --card token
+export const chartSurface = { light: "#ffffff", dark: "#232329" };
+
+export const chartFontFamily = "var(--font-inter), system-ui, sans-serif";
+
 function hexToRgb(hex: string): [number, number, number] {
   const n = parseInt(hex.slice(1), 16);
   return [(n >> 16) & 255, (n >> 8) & 255, n & 255];

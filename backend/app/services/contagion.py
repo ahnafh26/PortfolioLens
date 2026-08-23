@@ -32,8 +32,6 @@ STATUS_AT_RISK = "at_risk"
 STATUS_CRITICAL = "critical"
 
 
-# Graph construction
-
 def build_portfolio_graph(
     tickers: list[str],
     weights: dict[str, float],
@@ -62,8 +60,6 @@ def build_portfolio_graph(
 
     return graph
 
-
-# Shock diffusion
 
 @dataclass(frozen=True)
 class NodeImpact:
@@ -153,8 +149,6 @@ def simulate_shock(
     )
 
 
-# Risk narrative (LLM, falls back to rule-based, same pattern as ai_assistant.py)
-
 def _fallback_narrative(result: ShockSimulationResult, graph: nx.DiGraph, shock_magnitude: float) -> str:
     top = result.highest_risk_secondary[:3]
     if not top:
@@ -182,7 +176,10 @@ def generate_risk_summary(
     graph: nx.DiGraph,
     shock_magnitude: float,
 ) -> tuple[str, str]:
-    """Returns (narrative, source) where source is "llm" or "rule_based"."""
+    """LLM-narrated if configured, same rule-based/LLM fallback pattern as ai_assistant.py otherwise.
+
+    Returns (narrative, source) where source is "llm" or "rule_based".
+    """
     fallback = _fallback_narrative(result, graph, shock_magnitude)
 
     if not is_configured():

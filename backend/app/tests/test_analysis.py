@@ -140,6 +140,21 @@ def test_efficient_frontier_single_asset_degenerates_to_one_point():
     assert result.min_volatility.weights == {"A": 1.0}
 
 
+def test_efficient_frontier_respects_long_only_bounds():
+    """One holding is a clear loser; an unconstrained solver would short it to lever up on the other."""
+    rng = np.random.default_rng(3)
+    n = 200
+    returns = pd.DataFrame(
+        {"GOOD": rng.normal(0.003, 0.01, n), "BAD": rng.normal(-0.002, 0.015, n)}
+    )
+
+    result = analysis.efficient_frontier(returns, n_portfolios=15)
+
+    for portfolio in (result.max_sharpe, result.min_volatility):
+        for weight in portfolio.weights.values():
+            assert -1e-6 <= weight <= 1 + 1e-6
+
+
 # monte_carlo_simulation
 
 @pytest.fixture
@@ -177,6 +192,18 @@ def test_monte_carlo_var_matches_the_one_year_checkpoint_band(mc_returns):
     )
     one_year_band = next(b for b in result.bands if b.day == analysis.TRADING_DAYS_PER_YEAR)
     assert result.value_at_risk_95 == pytest.approx(1.0 - one_year_band.p5)
+
+
+def test_monte_carlo_handles_single_asset_portfolio():
+    """A one-holding portfolio has a 1x1 covariance matrix; Cholesky still needs to work on that."""
+    returns = pd.DataFrame({"A": [0.001, -0.004, 0.006, -0.002, 0.003, 0.0, -0.001, 0.005] * 10})
+
+    result = analysis.monte_carlo_simulation(returns, weights={"A": 1.0}, years=1, n_simulations=2_000, seed=5)
+
+    day_zero = result.bands[0]
+    assert day_zero.p5 == day_zero.p95 == pytest.approx(1.0)
+    for band in result.bands:
+        assert band.p5 <= band.p50 <= band.p95
 
 
 def test_monte_carlo_is_deterministic_given_a_seed(mc_returns):
@@ -228,3 +255,58 @@ def test_fetch_price_history_raises_when_nothing_is_usable(monkeypatch):
 
     with pytest.raises(analysis.InsufficientDataError):
         analysis.fetch_price_history(["BADTICKER", "TOOSHORT"], years=1)
+
+
+class _StaggeredStartYfTicker:
+    """AAA has a full year of history; RECENT only started trading partway through (e.g. a recent IPO)."""
+
+    def __init__(self, symbol: str):
+        self.symbol = symbol
+
+    def history(self, period: str, auto_adjust: bool) -> pd.DataFrame:
+        if self.symbol == "RECENT":
+            dates = pd.date_range("2023-01-21", periods=40, freq="D", tz="UTC")
+            return pd.DataFrame({"Close": 50.0 + np.arange(40, dtype=float)}, index=dates)
+
+        dates = pd.date_range("2023-01-01", periods=60, freq="D", tz="UTC")
+        return pd.DataFrame({"Close": 100.0 + np.arange(60, dtype=float)}, index=dates)
+
+
+def test_fetch_price_history_aligns_tickers_with_different_start_dates(monkeypatch):
+    monkeypatch.setattr(analysis.yf, "Ticker", _StaggeredStartYfTicker)
+
+    prices, skipped = analysis.fetch_price_history(["AAA", "RECENT"], years=1)
+
+    assert skipped == []
+    # only the window both tickers actually traded in survives the join
+    assert prices.shape[0] == 40
+    assert prices.index.min() == pd.Timestamp("2023-01-21")
+
+
+class _GappyYfTicker:
+    """AAA trades every day; GAPPY is missing one date in the middle (e.g. a trading halt)."""
+
+    def __init__(self, symbol: str):
+        self.symbol = symbol
+
+    def history(self, period: str, auto_adjust: bool) -> pd.DataFrame:
+        dates = pd.date_range("2023-01-01", periods=60, freq="D", tz="UTC")
+        if self.symbol == "GAPPY":
+            dates = dates.delete(30)
+            return pd.DataFrame({"Close": 50.0 + np.arange(59, dtype=float)}, index=dates)
+        return pd.DataFrame({"Close": 100.0 + np.arange(60, dtype=float)}, index=dates)
+
+
+def test_fetch_price_history_drops_only_the_missing_date_not_the_whole_ticker(monkeypatch):
+    monkeypatch.setattr(analysis.yf, "Ticker", _GappyYfTicker)
+
+    prices, skipped = analysis.fetch_price_history(["AAA", "GAPPY"], years=1)
+
+    assert skipped == []
+    assert list(prices.columns) == ["AAA", "GAPPY"]
+    assert prices.shape[0] == 59  # the one date GAPPY is missing gets dropped for both
+
+    # alignment shouldn't leave any gaps for correlation_matrix to choke on
+    returns = analysis.compute_returns(prices)
+    corr = analysis.correlation_matrix(returns)
+    assert not corr.isna().any().any()

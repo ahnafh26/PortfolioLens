@@ -13,11 +13,9 @@ import {
   type BacktestResponse,
   type HoldingInput,
 } from "@/lib/api";
-import { categorical, chartInk } from "@/lib/chart-colors";
+import { categorical, chartInk, chartSurface, chartFontFamily } from "@/lib/chart-colors";
 import { useChartTheme } from "@/hooks/use-chart-theme";
 import { formatPercent, formatRatio, formatSignedPercent } from "@/lib/format";
-
-const CHART_SURFACE = { light: "#ffffff", dark: "#232329" };
 
 const PERIODS: { value: BacktestPeriod; label: string }[] = [
   { value: "gfc_2008", label: "2008 Financial Crisis" },
@@ -88,12 +86,12 @@ export function BacktestChart({ holdings }: { holdings: HoldingInput[] }) {
     const benchmarkColor = categorical[mode][1];
     const ink = chartInk.secondary[mode];
     const grid = chartInk.gridline[mode];
-    const surface = CHART_SURFACE[mode];
+    const surface = chartSurface[mode];
 
     const chart = createChart(container, {
       width: container.clientWidth,
       height: 320,
-      layout: { background: { color: surface }, textColor: ink, fontFamily: "var(--font-inter), system-ui, sans-serif", attributionLogo: false },
+      layout: { background: { color: surface }, textColor: ink, fontFamily: chartFontFamily, attributionLogo: false },
       grid: { vertLines: { visible: false }, horzLines: { color: grid } },
       rightPriceScale: { borderVisible: false },
       timeScale: { borderVisible: false },

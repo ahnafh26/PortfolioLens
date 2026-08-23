@@ -8,6 +8,7 @@ from dataclasses import dataclass
 
 import yfinance as yf
 
+from app.services.analysis import DEFAULT_RISK_FREE_RATE
 from app.services.classification import concentration_flags, fetch_company_profile
 from app.services.llm_client import complete_chat, is_configured
 
@@ -18,14 +19,13 @@ SINGLE_HOLDING_CONCENTRATION_THRESHOLD = 0.20
 SECTOR_CONCENTRATION_THRESHOLD = 0.50
 HIGH_CORRELATION_THRESHOLD = 0.85
 HIGH_VOLATILITY_THRESHOLD = 0.30  # annualized
+MEANINGFUL_WEIGHT_FLOOR = 0.05  # below this, a high correlation between two holdings isn't worth flagging
 
 DISCLAIMER = (
     "This is general portfolio analytics, not personalized financial advice -- "
     "consider talking to a licensed advisor before acting on it."
 )
 
-
-# Rule-based signals (source of truth)
 
 @dataclass(frozen=True)
 class Signal:
@@ -42,7 +42,6 @@ def compute_signals(
 ) -> list[Signal]:
     signals: list[Signal] = []
 
-    # single-holding concentration
     for ticker, weight in sorted(weights.items(), key=lambda kv: kv[1], reverse=True):
         if weight >= SINGLE_HOLDING_CONCENTRATION_THRESHOLD:
             signals.append(
@@ -53,7 +52,6 @@ def compute_signals(
                 )
             )
 
-    # sector concentration
     for label, weight in concentration_flags(sector_breakdown, threshold=SECTOR_CONCENTRATION_THRESHOLD):
         signals.append(
             Signal(
@@ -63,13 +61,16 @@ def compute_signals(
             )
         )
 
-    # high correlation between meaningfully-weighted holdings
     for i, t1 in enumerate(correlation_tickers):
         for j, t2 in enumerate(correlation_tickers):
             if j <= i:
                 continue
             corr = correlation_matrix[i][j]
-            if corr >= HIGH_CORRELATION_THRESHOLD and weights.get(t1, 0) > 0.05 and weights.get(t2, 0) > 0.05:
+            if (
+                corr >= HIGH_CORRELATION_THRESHOLD
+                and weights.get(t1, 0) > MEANINGFUL_WEIGHT_FLOOR
+                and weights.get(t2, 0) > MEANINGFUL_WEIGHT_FLOOR
+            ):
                 signals.append(
                     Signal(
                         "info",
@@ -78,7 +79,6 @@ def compute_signals(
                     )
                 )
 
-    # overall volatility
     if portfolio_volatility >= HIGH_VOLATILITY_THRESHOLD:
         signals.append(
             Signal(
@@ -93,8 +93,6 @@ def compute_signals(
 
     return signals
 
-
-# Narration (LLM, falls back to rule-based)
 
 @dataclass
 class InsightsResult:
@@ -146,8 +144,6 @@ def generate_insights(
     return InsightsResult(insights=lines, source="llm")
 
 
-# Per-ticker research
-
 @dataclass
 class TickerResearchResult:
     ticker: str
@@ -164,7 +160,7 @@ def generate_ticker_research(ticker: str) -> TickerResearchResult:
 
     try:
         info = yf.Ticker(ticker).get_info()
-    except Exception as exc:
+    except Exception as exc:  # yfinance raises inconsistent exception types on failure
         logger.warning("Failed to fetch fundamentals for %s: %s", ticker, exc)
         info = {}
 
@@ -206,8 +202,6 @@ def generate_ticker_research(ticker: str) -> TickerResearchResult:
     )
 
 
-# Suggested allocations (deterministic, no LLM)
-
 RISK_PROFILE_RATIONALE = {
     "conservative": "Weighted inversely to each holding's volatility, so steadier holdings get more capital.",
     "balanced": "Split evenly across holdings -- a neutral starting point that doesn't tilt toward any one signal.",
@@ -226,10 +220,9 @@ def suggested_allocation(
     vols = {t: v for t, _, v in holdings}
 
     if risk_profile == "conservative":
-        # inverse-volatility weighting
         scores = {t: 1.0 / max(vols[t], 1e-6) for t in tickers}
     elif risk_profile == "growth":
-        sharpe = {t: (returns[t] - 0.04) / max(vols[t], 1e-6) for t in tickers}
+        sharpe = {t: (returns[t] - DEFAULT_RISK_FREE_RATE) / max(vols[t], 1e-6) for t in tickers}
         # shift positive, keep ordering
         floor = min(sharpe.values())
         scores = {t: (sharpe[t] - floor) + 0.05 for t in tickers}

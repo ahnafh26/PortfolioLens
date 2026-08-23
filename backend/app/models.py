@@ -4,8 +4,6 @@ from __future__ import annotations
 from pydantic import BaseModel, Field, field_validator, model_validator
 
 
-# Request models
-
 class HoldingInput(BaseModel):
     ticker: str = Field(..., min_length=1, max_length=10, description="Exchange ticker symbol, e.g. AAPL")
     weight: float = Field(..., gt=0, le=1, description="Fraction of the portfolio allocated to this holding, e.g. 0.25 for 25%")
@@ -37,8 +35,6 @@ class HoldingsRequestBase(BaseModel):
 class AnalyzeRequest(HoldingsRequestBase):
     lookback_years: int = Field(default=5, ge=1, le=20, description="How many years of daily price history to pull")
 
-
-# Response models
 
 class HoldingStats(BaseModel):
     """Per-holding stats, independent of portfolio interactions."""
@@ -124,8 +120,6 @@ class AnalyzeResponse(BaseModel):
     lookback_years: int
 
 
-# Ticker search models
-
 class TickerSearchResult(BaseModel):
     symbol: str
     name: str
@@ -135,8 +129,6 @@ class TickerSearchResult(BaseModel):
 class TickerSearchResponse(BaseModel):
     results: list[TickerSearchResult]
 
-
-# Backtesting models
 
 class BacktestRequest(HoldingsRequestBase):
     period: str = Field(
@@ -176,8 +168,6 @@ class BacktestResponse(BaseModel):
     beta: float
     skipped_tickers: list[str] = Field(default_factory=list)
 
-
-# Rebalancing models
 
 class CurrentHolding(BaseModel):
     ticker: str
@@ -222,8 +212,6 @@ class RebalanceResponse(BaseModel):
     total_value: float
     skipped_tickers: list[str] = Field(default_factory=list, description="Tickers whose current price couldn't be fetched")
 
-
-# AI assistant models
 
 RISK_PROFILES = ("conservative", "balanced", "growth", "aggressive")
 
@@ -283,16 +271,12 @@ class SuggestedAllocationResponse(BaseModel):
     rationale: str
 
 
-# Report export models
-
 class ExportRequest(BaseModel):
     """Re-formats an already-computed analysis, doesn't re-run one."""
 
     analysis: AnalyzeResponse
     ai_insights: list[str] | None = None
 
-
-# Contagion / shock simulation models
 
 class ShockSimulationRequest(HoldingsRequestBase):
     origin_ticker: str = Field(..., description="Ticker where the price shock originates, e.g. AAPL")
