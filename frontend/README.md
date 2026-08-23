@@ -3,7 +3,8 @@
 Build a portfolio, see its risk. Annualized return/volatility/Sharpe, a correlation
 heatmap, efficient frontier plot, 10-year Monte Carlo run with a 95% VaR, sector
 breakdown, a backtest against SPY through a couple historical crashes, a rebalance
-calculator, and an AI assistant for insights and per-ticker research. PDF/CSV export
+calculator, a contagion graph that simulates a price shock rippling across correlated
+holdings, and an AI assistant for insights and per-ticker research. PDF/CSV export
 too. All the numbers come from the FastAPI backend in `../backend`, this is just the
 frontend.
 
@@ -46,11 +47,12 @@ npm run lint
 
 ## Stack
 
-Next.js 16 App Router, TypeScript, Tailwind v4. UI components are hand-rolled
-shadcn-style stuff on top of Radix, not CLI-generated. Framer Motion for
-transitions. Recharts for the donut/heatmap/frontier scatter, lightweight-charts
-for the Monte Carlo fan and backtest line. Zustand holds the builder state
-(holdings + lookback), not persisted anywhere.
+Next.js 15 App Router, TypeScript, Tailwind v4. UI components are hand-rolled
+shadcn-style stuff on top of Radix, not CLI-generated. Transitions are plain CSS
+via tailwindcss-animate, no JS animation library. Recharts for the donut/frontier
+scatter, lightweight-charts for the Monte Carlo fan and backtest line, React Flow
+for the contagion graph. Zustand holds the builder state (holdings + lookback),
+not persisted anywhere.
 
 ## Layout
 
@@ -68,6 +70,7 @@ src/
     AIAssistantSidebar.tsx     insights, research, suggested allocation
     BacktestChart.tsx          vs-SPY stress test
     RebalanceCalculator.tsx    buy/sell order calc
+    ContagionGraph.tsx         shock simulation + correlation graph (React Flow)
     SectorBreakdown.tsx
   lib/
     api.ts       backend client
@@ -80,7 +83,8 @@ src/
 
 ## Notes
 
-- Dark mode follows system pref, toggle's in the header, uses next-themes.
+- Opens in light mode regardless of system preference; the toggle's in the
+  header and remembers your choice via next-themes.
 - Every async section has a skeleton and a real empty/error state. Turn off
   the backend and hit "Analyze portfolio" to see it.
 - AI Assistant badges tell you whether an insight was LLM-generated or a

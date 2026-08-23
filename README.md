@@ -2,24 +2,25 @@
 
 **Build a portfolio, see its risk.**
 
-PortfolioLens is a full-stack portfolio analytics application that turns a set of stocks and portfolio weights into risk, performance, diversification, optimization, and simulation insights.
+PortfolioLens takes a set of stocks and target weights and runs the numbers a quant desk would actually look at: expected return and volatility, the efficient frontier, a Monte Carlo projection of where the portfolio could go, how it would have survived past crashes, and how a shock to one holding ripples through the rest via correlation.
 
-Instead of looking at each stock individually, PortfolioLens focuses on how the holdings behave **together as a portfolio** using historical market data, portfolio optimization, Monte Carlo simulation, backtesting, and risk analysis.
-
+I built this to get past the point where I merely understood mean-variance optimization and Monte Carlo simulation on paper. Actually implementing them against real market data turned out to be the harder and more interesting part — see [What I Learned](#what-i-learned) below for the specific ways that bit back.
 
 ---
 
-## Features
+## What it does
 
-* **Portfolio analytics** — annualized return, volatility, Sharpe ratio, correlation, alpha, beta, maximum drawdown, and 1-year 95% VaR.
-* **Portfolio optimization** — efficient frontier visualization with maximum-Sharpe and minimum-volatility portfolios under long-only constraints.
-* **Monte Carlo simulation** — 10-year correlated portfolio simulations with percentile fan bands and risk estimates.
-* **Historical backtesting** — compare a portfolio against SPY during custom periods or major market events including the 2008 financial crisis, 2020 COVID crash, and 2022 rate-hike period.
-* **Portfolio breakdown** — sector exposure, market-cap distribution, concentration warnings, and correlations between holdings.
-* **Rebalancing** — convert target portfolio weights and total portfolio value into whole-share buy and sell orders.
-* **Contagion simulation** — model how a price shock to one holding could propagate across correlated assets.
-* **Portfolio insights** — rule-based risk signals with optional LLM narration, per-ticker research, and suggested allocations based on risk profile.
-* **Utilities** — fuzzy ticker/company search and CSV/PDF report exports.
+Add a few tickers and weights, and PortfolioLens:
+
+* Computes annualized return, volatility, Sharpe ratio, pairwise correlation, and 1-year 95% VaR for the portfolio and each holding.
+* Plots the efficient frontier — the best return achievable at each risk level — and locates the max-Sharpe and min-volatility portfolios on it, under long-only, fully-invested constraints.
+* Runs a 10,000-path Monte Carlo simulation of the portfolio's value over 10 years and reports the resulting percentile bands.
+* Backtests the portfolio against SPY through the 2008 crisis, the 2020 COVID crash, 2022's rate hikes, or any custom date range, and reports alpha, beta, and max drawdown.
+* Breaks the portfolio down by sector and market cap, and flags concentration over 50% in any one bucket.
+* Turns target weights and a total dollar value into whole-share buy/sell orders, accounting for whatever you already hold.
+* Simulates a price shock at one holding and diffuses it outward across a correlation graph, so you can see which other holdings would actually be at risk — not just the one you shocked.
+* Narrates all of the above through an AI assistant: rule-based risk signals by default, upgraded to LLM-written prose when an OpenRouter key is configured, plus per-ticker research and a risk-profile-based allocation suggestion.
+* Exports the whole analysis to CSV or PDF.
 
 ---
 
@@ -31,7 +32,7 @@ flowchart LR
 
     subgraph Frontend
         Next[Next.js + TypeScript]
-        Charts[Recharts + lightweight-charts]
+        Charts[Recharts + lightweight-charts + React Flow]
     end
 
     subgraph Backend
@@ -61,150 +62,63 @@ flowchart LR
     API --> LLM
 ```
 
-The frontend handles portfolio input and visualization, while the FastAPI backend performs the financial calculations. Portfolio data is processed in memory and is not stored in a database.
+The split is the usual one: Next.js handles input and visualization, FastAPI does the actual math. Nothing about a portfolio is persisted anywhere — it lives in memory for the length of a request and then it's gone. On the backend, `app/routers/` stays thin (parse the request, call a service, shape the response) and `app/services/` holds the framework-agnostic logic, which is what makes it possible to unit-test the quant code without spinning up FastAPI at all.
+
+The frontend uses three different charting approaches for three different jobs, not one library stretched to cover everything: **lightweight-charts** for the two time-series charts (the backtest line and the Monte Carlo fan), because it has native log price scales, crosshairs, and price lines that a general-purpose chart lib doesn't; **Recharts** for the efficient-frontier scatter and the allocation donut, where a declarative React API is simpler than it's worth fighting a finance-specific library for; and **React Flow** for the contagion graph, which needs a custom radial layout and floating edges that neither of the other two can do.
+
+**Backend:** FastAPI, pandas/NumPy, SciPy (optimization), yfinance (market data), RapidFuzz (ticker search), NetworkX (contagion graph), ReportLab (PDF export), OpenRouter (optional LLM narration).
+
+**Frontend:** Next.js, TypeScript, Tailwind CSS v4, Zustand, Radix UI.
 
 ---
 
-## Tech Stack
+## How it works
 
-### Backend
+### Returns and risk
 
-* **FastAPI / Python** — API and financial analysis
-* **pandas / NumPy** — historical data processing and numerical calculations
-* **SciPy** — portfolio optimization
-* **yfinance** — historical market data
-* **RapidFuzz** — ticker and company search
-* **NetworkX** — contagion graph modeling
-* **ReportLab** — PDF report generation
-* **OpenRouter** — optional LLM narration
-
-### Frontend
-
-* **Next.js 16**
-* **TypeScript**
-* **Tailwind CSS v4**
-* **Zustand**
-* **Recharts**
-* **lightweight-charts**
-* **Radix UI**
-
----
-
-## How It Works
-
-### Historical Returns
-
-PortfolioLens pulls historical adjusted closing prices through yfinance and aligns holdings across shared trading dates before calculating returns.
-
-Simple daily returns are used so portfolio return remains a weighted combination of the individual holdings:
+Historical adjusted closing prices come from yfinance, aligned across whichever trading dates every holding actually shares (a recent IPO or a trading halt just shrinks the shared window, it doesn't break the request). Returns are simple daily returns, not log returns, so portfolio return stays a clean weighted sum of the individual holdings:
 
 ```text
 Portfolio Return = w · μ
-```
-
-where `w` represents portfolio weights and `μ` represents expected returns.
-
-### Portfolio Risk
-
-Portfolio variance is calculated using the covariance matrix of the holdings:
-
-```text
 Portfolio Variance = wᵀΣw
 ```
 
-Portfolio volatility is then:
+`w` is the weight vector, `μ` the vector of expected (mean) returns, `Σ` the covariance matrix. Daily numbers get annualized with the standard 252-trading-day convention. Sharpe ratio, alpha, beta, max drawdown, and 1-year 95% VaR all fall out of the same return series.
 
-```text
-Portfolio Volatility = √(wᵀΣw)
-```
+### Optimization
 
-Daily volatility is annualized using the standard **252 trading days per year** convention.
+The efficient frontier comes from minimizing portfolio volatility at each of 50 target returns using SciPy's SLSQP solver, long-only and fully invested (no shorting, weights sum to 100%). The max-Sharpe and min-volatility portfolios are two more solves of the same problem, just optimizing a different objective.
 
-PortfolioLens also calculates metrics such as Sharpe ratio, alpha, beta, maximum drawdown, correlations, and 1-year 95% VaR.
+### Monte Carlo
 
-### Portfolio Optimization
+10,000 correlated geometric Brownian motion paths, seeded from historical mean returns and covariance. A Cholesky decomposition of the covariance matrix is what lets the simulated noise inherit the holdings' actual correlation structure instead of moving independently. The whole thing is vectorized as one `(simulations × checkpoints × assets)` NumPy array rather than looping in Python — at 10,000 paths that loop would be the slowest part of the request by a wide margin.
 
-The efficient frontier is generated by minimizing portfolio volatility across a range of target returns using **SciPy's SLSQP optimizer**.
+The result is percentile bands (5th/25th/50th/75th/95th) at each checkpoint plus a 1-year 95% VaR. It's a projection under the model's assumptions, built entirely from what already happened — not a forecast.
 
-The optimizer assumes:
+### Contagion
 
-* Long-only holdings
-* No short selling
-* Fully invested portfolios
-* Portfolio weights summing to 100%
-
-PortfolioLens separately calculates the **maximum-Sharpe** and **minimum-volatility** allocations.
-
-### Monte Carlo Simulation
-
-PortfolioLens simulates **10,000+ correlated geometric Brownian motion paths** using historical mean returns and covariance.
-
-A **Cholesky decomposition** is used to apply the historical correlation structure between holdings to the simulated returns.
-
-The simulation produces percentile bands including:
-
-```text
-5th
-25th
-50th (median)
-75th
-95th
-```
-
-as well as a 1-year 95% VaR estimate.
-
-These simulations represent possible outcomes under the model's assumptions — they are not predictions of future market performance.
+Holdings become nodes in a graph, edges connect pairs correlated above 0.35, and a shock at one node propagates outward with its impact decaying by a configurable factor at each hop. It's a simplified heat-diffusion model, not a real econometric contagion model — it's meant to be directionally useful for "what else in this portfolio would I want to watch," not a precise forecast of a crash's spread.
 
 ---
 
-## Running Locally
+## Running locally
 
-### Requirements
-
-* Python 3.11+
-* Node.js 20+
+**Requirements:** Python 3.11+, Node.js 20+
 
 ### Backend
 
 ```bash
 cd backend
-
 python -m venv .venv
-```
-
-Windows:
-
-```bash
-.venv\Scripts\activate
-```
-
-macOS/Linux:
-
-```bash
-source .venv/bin/activate
-```
-
-Install dependencies:
-
-```bash
+.venv\Scripts\activate       # macOS/Linux: source .venv/bin/activate
 pip install -r requirements.txt
-```
-
-Optionally build the local ticker search index:
-
-```bash
-python scripts/build_ticker_index.py
-```
-
-Start the API:
-
-```bash
+python scripts/build_ticker_index.py   # optional: builds the local ticker search index
 uvicorn app.main:app --reload --port 8000
 ```
 
 ### Frontend
 
-Open a second terminal:
+In a second terminal:
 
 ```bash
 cd frontend
@@ -212,35 +126,21 @@ npm install
 npm run dev
 ```
 
-Then open:
-
-```text
-http://localhost:3000
-```
-
-The frontend uses:
-
-```text
-http://localhost:8000
-```
-
-as the default backend API.
-
-To use another backend:
+Open `http://localhost:3000`. It talks to `http://localhost:8000` by default; point it elsewhere with:
 
 ```env
 NEXT_PUBLIC_API_BASE_URL=https://your-api.example.com
 ```
 
-`NEXT_PUBLIC_API_BASE_URL` is public configuration and does not contain private credentials.
+That variable is public config, not a secret — it just tells the browser where to send requests.
 
-For optional LLM narration, set the following **only on the backend**:
+For LLM-narrated insights instead of the rule-based fallback, set this on the **backend only**:
 
 ```env
 OPENROUTER_API_KEY=your_key_here
 ```
 
-If no OpenRouter key is configured, PortfolioLens automatically falls back to deterministic rule-based insights.
+No key means PortfolioLens quietly falls back to deterministic, rule-based insights — the app works the same either way, just with plainer prose.
 
 ---
 
@@ -273,7 +173,7 @@ None of this depends on the API's URL being secret. It isn't, and it doesn't nee
 
 ---
 
-## Deploying Publicly
+## Deploying publicly
 
 Before deploying a public instance:
 
@@ -289,7 +189,7 @@ Current rate limiting and analysis concurrency controls operate **per backend pr
 
 ---
 
-## Known Limitations
+## Known limitations
 
 Everything here is backward-looking by construction — return, volatility, and correlation
 come from what already happened, and Monte Carlo and the optimizer inherit whatever bias
@@ -312,23 +212,24 @@ either way — PortfolioLens only holds a portfolio in memory for the life of th
 
 ---
 
-## Project Structure
+## Project structure
 
 ```text
 PortfolioLens/
 ├── backend/
 │   ├── app/
-│   │   ├── api/
-│   │   ├── services/
-│   │   ├── models.py
+│   │   ├── routers/       # thin FastAPI endpoints
+│   │   ├── services/      # the actual math/logic, framework-agnostic
+│   │   ├── tests/
+│   │   ├── models.py      # request/response schemas, shared with the frontend types
 │   │   └── main.py
-│   ├── scripts/
-│   └── tests/
+│   └── scripts/
 │
 ├── frontend/
 │   ├── src/
 │   │   ├── app/
 │   │   ├── components/
+│   │   ├── hooks/
 │   │   └── lib/
 │   └── public/
 │
@@ -339,7 +240,7 @@ More backend and frontend implementation details are available in their respecti
 
 ---
 
-## What I Learned
+## What I learned
 
 The formulas themselves ended up being the easier part of the project. Working with real market data meant dealing with different listing dates, missing trading days, portfolio alignment, edge cases, and numerical stability.
 
