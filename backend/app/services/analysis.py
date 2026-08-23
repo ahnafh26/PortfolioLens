@@ -20,6 +20,10 @@ MIN_PRICE_POINTS = 30
 
 DEFAULT_RISK_FREE_RATE = 0.04
 
+# Nudges the covariance matrix's diagonal so Cholesky doesn't choke on a holding with exactly
+# zero return variance (flat/stale prices). Negligible next to real daily variances (~1e-4+).
+COVARIANCE_JITTER = 1e-8
+
 
 class InsufficientDataError(Exception):
     pass
@@ -268,8 +272,8 @@ def monte_carlo_simulation(
     # Ito correction: mu - 0.5*sigma^2, otherwise exp() of drifted log-returns overstates expected price
     drift_daily = mean_daily - 0.5 * np.diag(cov_daily)
 
-    # Cholesky so independent noise gets the right correlation structure when multiplied through
-    chol = np.linalg.cholesky(cov_daily)
+    # Apply the historical correlation structure to the simulated noise.
+    chol = np.linalg.cholesky(cov_daily + COVARIANCE_JITTER * np.eye(n_assets))
 
     total_days = years * TRADING_DAYS_PER_YEAR
 

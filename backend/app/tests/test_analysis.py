@@ -155,6 +155,18 @@ def test_efficient_frontier_respects_long_only_bounds():
             assert -1e-6 <= weight <= 1 + 1e-6
 
 
+def test_efficient_frontier_handles_a_zero_volatility_holding():
+    """A holding with a flat price history makes the covariance matrix singular; the optimizer
+    should still solve rather than error out (unlike Monte Carlo's Cholesky step)."""
+    rng = np.random.default_rng(3)
+    returns = pd.DataFrame({"CASH": [0.0] * 60, "AAPL": rng.normal(0.001, 0.02, 60)})
+
+    result = analysis.efficient_frontier(returns, n_portfolios=10)
+
+    assert sum(result.max_sharpe.weights.values()) == pytest.approx(1.0, abs=1e-6)
+    assert result.min_volatility.annual_volatility == pytest.approx(0.0, abs=1e-6)
+
+
 # monte_carlo_simulation
 
 @pytest.fixture
@@ -204,6 +216,21 @@ def test_monte_carlo_handles_single_asset_portfolio():
     assert day_zero.p5 == day_zero.p95 == pytest.approx(1.0)
     for band in result.bands:
         assert band.p5 <= band.p50 <= band.p95
+
+
+def test_monte_carlo_handles_a_zero_volatility_holding():
+    """A holding with a flat price history makes the covariance matrix singular, which used to
+    crash the Cholesky step with LinAlgError. It should degenerate gracefully instead."""
+    rng = np.random.default_rng(7)
+    returns = pd.DataFrame({"CASH": [0.0] * 60, "AAPL": rng.normal(0.001, 0.02, 60)})
+
+    result = analysis.monte_carlo_simulation(
+        returns, weights={"CASH": 0.5, "AAPL": 0.5}, years=1, n_simulations=2_000, seed=5
+    )
+
+    for band in result.bands:
+        assert band.p5 <= band.p50 <= band.p95
+    assert 0.0 < result.value_at_risk_95 < 1.0
 
 
 def test_monte_carlo_is_deterministic_given_a_seed(mc_returns):
