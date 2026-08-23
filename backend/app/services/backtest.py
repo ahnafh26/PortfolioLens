@@ -13,6 +13,7 @@ from app.services.analysis import (
     MIN_PRICE_POINTS,
     InsufficientDataError,
     annualize_return,
+    closes_from_history,
     compute_returns,
 )
 from app.services.cache import PRICE_HISTORY_CACHE, cached_call
@@ -37,13 +38,7 @@ def _fetch_single_ticker_closes_range(ticker: str, start: str, end: str) -> pd.S
     except Exception as exc:
         logger.warning("Failed to fetch price history for %s (%s to %s): %s", ticker, start, end, exc)
         return None
-
-    closes = history.get("Close")
-    if closes is None or closes.dropna().shape[0] < MIN_PRICE_POINTS:
-        return None
-
-    closes.index = closes.index.tz_localize(None).normalize()
-    return closes
+    return closes_from_history(ticker, history)
 
 
 def fetch_price_history_range(tickers: list[str], start: str, end: str) -> tuple[pd.DataFrame, list[str]]:

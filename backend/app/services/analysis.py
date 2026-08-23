@@ -29,6 +29,19 @@ class InsufficientDataError(Exception):
     pass
 
 
+def closes_from_history(ticker: str, history: pd.DataFrame) -> pd.Series | None:
+    """Shared by analysis._fetch_single_ticker_closes and backtest's date-range equivalent:
+    pulls Close out of a yfinance history frame, enforces the min-points floor, and
+    normalizes the tz-aware index to plain dates so frames line up on join."""
+    closes = history.get("Close")
+    if closes is None or closes.dropna().shape[0] < MIN_PRICE_POINTS:
+        logger.warning("Ticker %s returned too little price history (%s points); skipping", ticker, 0 if closes is None else closes.dropna().shape[0])
+        return None
+
+    closes.index = closes.index.tz_localize(None).normalize()
+    return closes
+
+
 @cached_call(PRICE_HISTORY_CACHE, key_prefix="price_history")
 def _fetch_single_ticker_closes(ticker: str, period: str) -> pd.Series | None:
     """Cached so repeat requests don't re-hit yfinance."""
@@ -37,15 +50,7 @@ def _fetch_single_ticker_closes(ticker: str, period: str) -> pd.Series | None:
     except Exception as exc:  # yfinance raises a mix of exception types depending on the failure
         logger.warning("Failed to fetch price history for %s: %s", ticker, exc)
         return None
-
-    closes = history.get("Close")
-    if closes is None or closes.dropna().shape[0] < MIN_PRICE_POINTS:
-        logger.warning("Ticker %s returned too little price history (%s points); skipping", ticker, 0 if closes is None else closes.dropna().shape[0])
-        return None
-
-    # normalize tz-aware index to plain date so frames line up on join
-    closes.index = closes.index.tz_localize(None).normalize()
-    return closes
+    return closes_from_history(ticker, history)
 
 
 def fetch_price_history(tickers: list[str], years: int) -> tuple[pd.DataFrame, list[str]]:
