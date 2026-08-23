@@ -5,17 +5,13 @@ import { useState } from "react";
 import { correlationColor } from "@/lib/chart-colors";
 import { useChartTheme } from "@/hooks/use-chart-theme";
 import { cn } from "@/lib/utils";
-
-export interface CorrelationMatrixData {
-  tickers: string[];
-  matrix: number[][];
-}
+import type { CorrelationMatrix } from "@/lib/api";
 
 function textColorFor(value: number): string {
   return Math.abs(value) > 0.55 ? "#ffffff" : "currentColor";
 }
 
-export function CorrelationHeatmap({ tickers, matrix }: CorrelationMatrixData) {
+export function CorrelationHeatmap({ tickers, matrix }: CorrelationMatrix) {
   const mode = useChartTheme();
   const [hovered, setHovered] = useState<{ row: number; col: number } | null>(null);
   const showInlineValues = tickers.length <= 8;

@@ -1,5 +1,5 @@
 import type { HoldingStats } from "@/lib/api";
-import { formatCompactWeight, formatPercent, formatRatio } from "@/lib/format";
+import { formatPercent, formatRatio } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
 export function HoldingsTable({ holdings }: { holdings: HoldingStats[] }) {
@@ -22,7 +22,7 @@ export function HoldingsTable({ holdings }: { holdings: HoldingStats[] }) {
             <tr key={h.ticker} className="border-b border-border/60 last:border-0">
               <td className="py-2.5 pr-4 font-medium">{h.ticker}</td>
               <td className="py-2.5 pr-4 tabular-nums text-muted-foreground">
-                {formatCompactWeight(h.weight)}
+                {formatPercent(h.weight, 0)}
               </td>
               <td
                 className={cn(

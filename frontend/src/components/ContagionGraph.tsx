@@ -26,9 +26,9 @@ import {
   type NodeProps,
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
+import { AlertTriangle, Info, Loader2, Radio, TrendingDown, Zap } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
-import { IconBroadcast, IconInfo, IconShock, IconSpinner, IconTrendDown, IconWarning } from "@/components/icons";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { InfoTooltip } from "@/components/InfoTooltip";
@@ -37,7 +37,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { ErrorState } from "@/components/ErrorState";
 import { useChartTheme } from "@/hooks/use-chart-theme";
 import { correlationColor, status as statusPalette } from "@/lib/chart-colors";
-import { formatCompactWeight, formatSignedPercent } from "@/lib/format";
+import { formatPercent, formatSignedPercent } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import {
   ApiError,
@@ -207,7 +207,7 @@ function ContagionNode({ data }: NodeProps<ContagionRFNode>) {
         title={`${graphNode.ticker}, ${graphNode.sector}`}
       >
         <span className="font-mono text-xs font-semibold leading-none">{graphNode.ticker}</span>
-        <span className="mt-1 font-mono text-[10px] leading-none opacity-80">{formatCompactWeight(graphNode.weight)}</span>
+        <span className="mt-1 font-mono text-[10px] leading-none opacity-80">{formatPercent(graphNode.weight, 0)}</span>
         {graphNode.price_drawdown !== 0 && (
           <span className="mt-1 font-mono text-[10px] font-medium leading-none tabular-nums">
             {formatSignedPercent(graphNode.price_drawdown)}
@@ -240,7 +240,7 @@ function ContagionSummaryPanel({ result }: { result: ShockSimulationResponse }) 
     <div className="flex h-full flex-col gap-4 rounded border border-border p-4">
       <div>
         <div className="flex items-center gap-2 text-sm text-muted-foreground">
-          <IconTrendDown className="size-4" />
+          <TrendingDown className="size-4" />
           Total portfolio impact
         </div>
         <p className="mt-1 font-mono text-2xl font-semibold tabular-nums text-negative">
@@ -438,7 +438,7 @@ function ContagionGraphInner({ holdings, lookbackYears = 3 }: ContagionGraphProp
   if (holdings.length < 2) {
     return (
       <div className="flex flex-col items-center gap-2 rounded border border-border bg-muted px-6 py-12 text-center text-sm text-muted-foreground">
-        <IconBroadcast className="size-6" />
+        <Radio className="size-6" />
         Add at least 2 holdings to explore contagion pathways between them.
       </div>
     );
@@ -448,7 +448,7 @@ function ContagionGraphInner({ holdings, lookbackYears = 3 }: ContagionGraphProp
     <Card className="overflow-hidden">
       <CardHeader>
         <CardTitle className="flex items-center gap-2 text-base font-semibold text-foreground">
-          <IconBroadcast className="size-4 text-accent" />
+          <Radio className="size-4 text-accent" />
           Contagion &amp; shock simulator
         </CardTitle>
         <CardDescription>
@@ -490,7 +490,7 @@ function ContagionGraphInner({ holdings, lookbackYears = 3 }: ContagionGraphProp
             <Label htmlFor="contagion-decay" className="flex items-center gap-1">
               Decay factor: {decayFactor.toFixed(2)}
               <InfoTooltip text="How much a shock's impact shrinks at each hop across correlated holdings. Closer to 1 means the ripple travels further before fading out.">
-                <IconInfo className="size-3.5" />
+                <Info className="size-3.5" />
               </InfoTooltip>
             </Label>
             <input
@@ -505,7 +505,7 @@ function ContagionGraphInner({ holdings, lookbackYears = 3 }: ContagionGraphProp
           </div>
 
           <Button onClick={() => runSimulation()} disabled={loading}>
-            {loading ? <IconSpinner className="size-4 animate-spin" /> : <IconShock className="size-4" />}
+            {loading ? <Loader2 className="size-4 animate-spin" /> : <Zap className="size-4" />}
             Run shock simulation
           </Button>
         </div>
@@ -514,7 +514,7 @@ function ContagionGraphInner({ holdings, lookbackYears = 3 }: ContagionGraphProp
 
         {!error && result?.skipped_tickers && result.skipped_tickers.length > 0 && (
           <div className="flex items-center gap-2 rounded border border-border bg-muted px-4 py-3 text-xs text-muted-foreground">
-            <IconWarning className="size-4 shrink-0" />
+            <AlertTriangle className="size-4 shrink-0" />
             Couldn&apos;t resolve {result.skipped_tickers.join(", ")}, excluded from the graph.
           </div>
         )}
