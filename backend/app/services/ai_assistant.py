@@ -172,12 +172,13 @@ def generate_ticker_research(ticker: str) -> TickerResearchResult:
         f"{' (' + profile.market_cap_bucket + ')' if not profile.is_fund else ''}."
         + (f" Trailing P/E: {trailing_pe:.1f}." if trailing_pe else "")
     )
+    base = dict(
+        ticker=ticker, name=profile.name, sector=profile.sector,
+        market_cap_bucket=profile.market_cap_bucket, trailing_pe=trailing_pe,
+    )
 
     if not is_configured():
-        return TickerResearchResult(
-            ticker=ticker, name=profile.name, sector=profile.sector, market_cap_bucket=profile.market_cap_bucket,
-            trailing_pe=trailing_pe, summary=fallback_summary, source="rule_based",
-        )
+        return TickerResearchResult(**base, summary=fallback_summary, source="rule_based")
 
     prompt = (
         "Summarize the following company/fund in 2-3 sentences for a retail investor comparing it "
@@ -191,15 +192,9 @@ def generate_ticker_research(ticker: str) -> TickerResearchResult:
     )
     reply = complete_chat([{"role": "user", "content": prompt}], max_tokens=250)
     if reply is None:
-        return TickerResearchResult(
-            ticker=ticker, name=profile.name, sector=profile.sector, market_cap_bucket=profile.market_cap_bucket,
-            trailing_pe=trailing_pe, summary=fallback_summary, source="rule_based",
-        )
+        return TickerResearchResult(**base, summary=fallback_summary, source="rule_based")
 
-    return TickerResearchResult(
-        ticker=ticker, name=profile.name, sector=profile.sector, market_cap_bucket=profile.market_cap_bucket,
-        trailing_pe=trailing_pe, summary=reply.strip(), source="llm",
-    )
+    return TickerResearchResult(**base, summary=reply.strip(), source="llm")
 
 
 RISK_PROFILE_RATIONALE = {

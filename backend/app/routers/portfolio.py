@@ -130,22 +130,12 @@ def analyze_portfolio(request: AnalyzeRequest) -> AnalyzeResponse:
         efficient_frontier=EfficientFrontier(
             points=[FrontierPoint(annual_return=r, annual_volatility=v) for r, v in frontier.points],
             user_portfolio=FrontierPoint(annual_return=portfolio_return, annual_volatility=portfolio_vol),
-            max_sharpe=OptimalPortfolio(
-                annual_return=frontier.max_sharpe.annual_return,
-                annual_volatility=frontier.max_sharpe.annual_volatility,
-                sharpe_ratio=frontier.max_sharpe.sharpe_ratio,
-                weights=frontier.max_sharpe.weights,
-            ),
-            min_volatility=OptimalPortfolio(
-                annual_return=frontier.min_volatility.annual_return,
-                annual_volatility=frontier.min_volatility.annual_volatility,
-                sharpe_ratio=frontier.min_volatility.sharpe_ratio,
-                weights=frontier.min_volatility.weights,
-            ),
+            max_sharpe=OptimalPortfolio.model_validate(frontier.max_sharpe, from_attributes=True),
+            min_volatility=OptimalPortfolio.model_validate(frontier.min_volatility, from_attributes=True),
         ),
         monte_carlo=MonteCarloResponseModel(
             starting_value=mc.starting_value,
-            bands=[MonteCarloBand(day=b.day, p5=b.p5, p25=b.p25, p50=b.p50, p75=b.p75, p95=b.p95) for b in mc.bands],
+            bands=[MonteCarloBand.model_validate(b, from_attributes=True) for b in mc.bands],
             value_at_risk_95=mc.value_at_risk_95,
         ),
         factor_breakdown=factor_breakdown,
@@ -200,18 +190,7 @@ def rebalance(request: RebalanceRequest) -> RebalanceResponse:
         raise HTTPException(status_code=422, detail="Couldn't fetch a current price for any of the requested tickers")
 
     return RebalanceResponse(
-        orders=[
-            RebalanceOrder(
-                ticker=o.ticker,
-                action=o.action,
-                shares=o.shares,
-                price=o.price,
-                dollar_amount=o.dollar_amount,
-                current_value=o.current_value,
-                target_value=o.target_value,
-            )
-            for o in result.orders
-        ],
+        orders=[RebalanceOrder.model_validate(o, from_attributes=True) for o in result.orders],
         leftover_cash=result.leftover_cash,
         total_value=result.total_value,
         skipped_tickers=result.skipped_tickers,
